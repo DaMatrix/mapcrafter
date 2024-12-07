@@ -20,7 +20,6 @@ gmon.out
 docs/_build/
 
 /_wd_
-/.vscode
 /build
 build-fast.sh
 build.sh
@@ -32,3 +31,4 @@ start-nginx.sh
 *.dylib
 src/data/blocks
 .gitlab-ci.yml
+mapcrafter.code-workspace

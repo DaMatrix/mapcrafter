@@ -1,0 +1,85 @@
+{
+	"name": "mapcrafter",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"mounts": [
+		"source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+		"source=/${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached,readonly",
+		"source=/${localWorkspaceFolder}/_wd_/html,target=/var/www/mchtml,type=bind,consistency=cached,readonly"
+	],
+	"workspaceFolder": "/workspace",
+	"forwardPorts": [
+		80
+	],
+	"portsAttributes": {
+		"80": {
+			"protocol": "http",
+			"label": "nginx",
+			"onAutoForward": "openPreview",
+			"requireLocalPort": false
+		}
+	},
+	// Necessary to allow debugging in devcontainer
+	"capAdd": [
+		"SYS_PTRACE"
+	],
+	"securityOpt": [
+		"seccomp=unconfined",
+		"apparmor=unconfined"
+	],
+	// "privileged": true,
+	// Environment variables to inject in the container
+	"containerEnv": {},
+	// -----------------------------------------------------------------
+	// Ran on host machine before creating the container
+	"initializeCommand": "",
+	// Ran on container when a dev container is created.
+	"onCreateCommand": "",
+	// Ran on container whenever new content is available in the source tree during the creation process.
+	"updateContentCommand": "",
+	// Ran on container once the dev container has been assigned to a user for the first time
+	"postCreateCommand": ".devcontainer/postCreateCommand.sh",
+	// Ran on container each time the container is successfully started.
+	"postStartCommand": ".devcontainer/postStartCommand.sh",
+	// Ran on container each time a tool has successfully attached to the container.
+	"postAttachCommand": "",
+	// -----------------------------------------------------------------
+	// List of extensions for vscode
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"editor.formatOnSave": false,
+				"files.insertFinalNewline": true
+			},
+			"extensions": [
+				"hilleer.yaml-plus-json",
+				"aeschli.vscode-css-formatter",
+				"ms-azuretools.vscode-docker",
+				"GitLab.gitlab-workflow",
+				"eamodio.gitlens",
+				"ms-vscode.hexeditor",
+				"oderwat.indent-rainbow",
+				"VisualStudioExptTeam.vscodeintellicode",
+				"VisualStudioExptTeam.intellicode-api-usage-examples",
+				"tkrkt.linenote",
+				"foxundermoon.shell-format",
+				"DotJoshJohnson.xml",
+				"redhat.vscode-yaml",
+				"twxs.cmake",
+				"ms-vscode.cmake-tools",
+				"josetr.cmake-language-support-vscode",
+				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-extension-pack",
+				"xaver.clang-format",
+				"lanza.lldb-vscode",
+				"vadimcn.vscode-lldb",
+				"webfreak.debug",
+				"DavidAnson.vscode-markdownlint",
+				"jeff-hykin.better-cpp-syntax",
+				"ms-vscode-remote.remote-containers",
+				"ms-vscode.cpptools-themes"
+			]
+		}
+	}
+}

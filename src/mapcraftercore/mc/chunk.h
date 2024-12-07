@@ -36,7 +36,7 @@ class BlockStateRegistry;
 const int CHUNK_LOWEST = -4;	// Included
 const int CHUNK_HIGHEST = 20;	// Excluded
 const int Y_CHUNKS_PER_REGION_FILE = 24;	// Number of chunksection in a chunk (to date)
-const int OUT_OF_WORLD_LIGHT = 9;	// Lighting value for shading side of the world
+const int OUT_OF_WORLD_LIGHT = 10;	// Lighting value for shading side of the world
 
 /**
  * A 16x16x16 section of a chunk.

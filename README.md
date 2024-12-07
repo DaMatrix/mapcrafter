@@ -26,14 +26,14 @@ using Leaflet.js.
 <!-- /TOC -->
 
 ## Block Status
-Featuring blocks up to 1.20
-![](./src/data/blocks/isometric_0_16.png)
+Featuring blocks up to 1.21.4
+![](./docs/isometric_0_16.png)
 
 ![](./docs/mapcrafter.png)
 
 ## Supported Minecraft versions
 
-The current version supports Minecraft versions 1.18.x. Newer versions may partially work.
+The current version supports Minecraft versions 1.18 onward.
 For Minecraft 1.17.x (or older) please use previous version of Mapcrafter.
 
 ## Features

@@ -262,18 +262,19 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			}
 
 			if (block_image->shadow_edges > 0) {
-				auto shadow_edge = [this, top](const mc::BlockDir& dir) {
-					const BlockImage& b = block_images->getBlockImage(getBlock(top + dir).id);
-					return b.shadow_edges == 0;
+				auto shadow_edge = [this, id, top](const mc::BlockDir& dir) {
+					uint16_t bid = getBlock(top + dir).id;
+					const BlockImage& b = block_images->getBlockImage(bid);
+					return b.is_transparent && id != bid;
 				};
-				uint8_t diff_top = (id != id_top);
-				uint8_t north = shadow_edge(render_view->getRotation().getNorth()) && diff_top;
-				uint8_t south = shadow_edge(render_view->getRotation().getSouth()) && diff_top;
-				uint8_t east = shadow_edge(render_view->getRotation().getEast()) && diff_top;
-				uint8_t west = shadow_edge(render_view->getRotation().getWest()) && diff_top;
-				uint8_t bottom = shadow_edge(render_view->getRotation().getBottom());
-				uint8_t bottomleft = bottom && (id != id_west);
-				uint8_t bottomright = bottom && (id != id_south);
+				bool top = shadow_edge(render_view->getRotation().getTop());
+				bool bottom = shadow_edge(render_view->getRotation().getBottom());
+				uint8_t north = shadow_edge(render_view->getRotation().getNorth()) && top;
+				uint8_t south = shadow_edge(render_view->getRotation().getSouth()) && top;
+				uint8_t east = shadow_edge(render_view->getRotation().getEast()) && top;
+				uint8_t west = shadow_edge(render_view->getRotation().getWest()) && top;
+				uint8_t bottomleft = shadow_edge(render_view->getRotation().getWest()) && bottom;
+				uint8_t bottomright = shadow_edge(render_view->getRotation().getSouth()) && bottom;
 
 				if (north + south + east + west + bottomleft + bottomright != 0) {
 					int f = block_image->shadow_edges;
@@ -313,7 +314,9 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			}
 
 			uint32_t biome_color = getBiomeColor(top, waterlog_full_image, current_chunk);
-			biome_color = rgba(rgba_red(biome_color), rgba_green(biome_color), rgba_blue(biome_color), (render_view->getWaterOpacity() * 255));
+			mc::Block block = getBlock(top, mc::GET_ID | mc::GET_LIGHT);
+			float light = std::max(block.sky_light, block.block_light) / 15.0f;
+			biome_color = rgba(rgba_red(biome_color) * light, rgba_green(biome_color) * light, rgba_blue(biome_color) * light, (render_view->getWaterOpacity() * 255));
 
 			std::vector<RGBAPixel>::const_iterator pit      = waterlog->data.begin();
 			std::vector<RGBAPixel>::const_iterator pitend   = waterlog->data.end();

@@ -1,8 +1,20 @@
 # Mapcrafter version history
 
+**v.3.1.416**
+
+* Update blocks to include 1.21.4 blocks (pale woods, reisin, ...)
+* Add devcontainer configuration
+
+**v.3.1.413**
+
+* Blocks updated (1.20.4)
+* Fix grass gray coloring
+* Fix shading on decorated pots
+* Fix waterlog on skulk sensors
+
 **v.3.1.388**
 
-* Blocks updated (1.20.3-pre2 & 23w46a)
+* Blocks updated (1.20.3)
 * Fix UI coordinates (Thanks to @kevinwchang)
 * Fix signs from 1.20 in marker tool (Thanks to @doismellburning)
 

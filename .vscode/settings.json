@@ -1,0 +1,19 @@
+{
+    "C_Cpp.intelliSenseEngineFallback": "enabled",
+    "cmake.buildEnvironment": {
+        "CMAKE_C_FLAGS_DEBUG": ""
+    },
+    "cmake.configureEnvironment": {
+        "OPT_DEBUG": "ON",
+        "OPT_OPTIMIZE": "OFF"
+    },
+    "C_Cpp.clang_format_fallbackStyle": "LLVM",
+    "C_Cpp.errorSquiggles": "enabled",
+    "files.associations": {
+        "chrono": "cpp",
+        "random": "cpp",
+        "limits": "cpp",
+        "semaphore": "cpp",
+        "algorithm": "cpp"
+    }
+}

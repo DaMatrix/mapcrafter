@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(lldb) Mapcrafter Debug",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/workspace/build/build/mapcrafter",
+            "args": [
+                "-c",
+                "_wd_/config1.conf",
+                "-j",
+                "4",
+                "-F",
+            ],
+            "terminal": "integrated",
+            "cwd": "${workspaceRoot}",
+        },
+        {
+            "name": "(lldb) Mapcrafter version",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/workspace/build/build/mapcrafter",
+            "args": [
+                "-v",
+            ],
+            "cwd": "${workspaceRoot}",
+        },
+        {
+            "name": "(lldb) Markers",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/workspace/build/build/mapcrafter_markers",
+            "args": [
+                "-c",
+                "_wd_/config1.conf",
+            ],
+            "terminal": "integrated",
+            "cwd": "${workspaceRoot}",
+        }
+    ]
+}

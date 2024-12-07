@@ -164,7 +164,8 @@ inline uint32_t mix(uint32_t x, uint32_t y, uint32_t a) {
 }
 
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
-		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up) {
+		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
+		const uint8_t *light_fnc) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
@@ -221,6 +222,9 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		uint32_t ab = mix(f[0], f[1], u); // divide255((255-u) * f[0], u * f[1]);
 		uint32_t cd = mix(f[2], f[3], u); // divide255((255-u) * f[2], u * f[3]);
 		uint32_t x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
+
+		// apply light function 
+		x = light_fnc[x];
 
 		// OHNE BASIS
 		// 45.68
@@ -405,13 +409,13 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 			// edge=2: edge with threshold 3px
 			// edge=3: edge with threshold 3px, a bit darker (for stronger visual on leaves etc.)
 			float t = (float) (1 + std::min(2, edge)) / 16.0;
-			float strong = 64;
-			float weak = 32;
-			if (edge > 2) {
-				strong = 128;
-				weak = 64;
-			}
 			if (edge && face == mask_face && uv < t) {
+				float strong = 48;
+				float weak = 24;
+				if (edge > 2) {
+					strong = 96;
+					weak = 48;
+				}
 				if (uv < t / 2.0) {
 					setalpha(strong);
 				} else {
@@ -792,6 +796,7 @@ void RenderedBlockImages::runBenchmark() {
 	CornerValues left = {1.0, 0.8, 0.5, 1.0};
 	CornerValues right = {1.0, 0.6, 0.3, 0.8};
 	CornerValues up = {0.5, 1.0, 0.6, 0.8};
+	uint8_t light_fnc[256] = {};
 
 	std::chrono::time_point<clock_> begin = clock_::now();
 	const RGBAImage& image = solid.image(0);
@@ -817,7 +822,7 @@ void RenderedBlockImages::runBenchmark() {
 		// 6.345s mit rgb_multiply_scalar inline
 		// 6.377s mit rgba_multiply_scalar ohne f+1
 		// 6.126s doch wenn der alpha check drin ist
-		blockImageMultiply(solid_image, solid.uv_image(0), left, right, up);
+		blockImageMultiply(solid_image, solid.uv_image(0), left, right, up, light_fnc);
 	}
 
 	double elapsed = std::chrono::duration_cast<second_>(clock_::now() - begin).count();

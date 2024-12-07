@@ -101,6 +101,7 @@ private:
 	double lighting_intensity, lighting_water_intensity;
 	bool simulate_sun_light;
 	FaceCorners CORNERS_LEFT, CORNERS_RIGHT, CORNERS_TOP, CORNERS_BOTTOM;
+	uint8_t light_func[256];
 
 	/**
 	 * Calculates the color of the light of a block.
