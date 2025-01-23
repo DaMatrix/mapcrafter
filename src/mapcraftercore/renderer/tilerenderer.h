@@ -75,9 +75,6 @@ public:
 	virtual int getTileHeight() const;
 
 protected:
-	// void sortTiles(boost::container::vector<TileImage>& tile_images) const;
-	typedef bool cmpBlockPos(const TileImage &, const TileImage &);
-	cmpBlockPos* getTileComparator() const;
 	void renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockDir& dir, boost::container::vector<TileImage>& tile_images);
 	virtual void renderTopBlocks(const TilePos& tile_pos, boost::container::vector<TileImage>& tile_images) {}
 
