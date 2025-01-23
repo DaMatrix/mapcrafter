@@ -19,7 +19,8 @@
 
 #include "tilerenderer.h"
 
-#include <boost/range/algorithm/sort.hpp>
+#include <algorithm> //std::sort()
+#include <vector>
 
 #include "blockimages.h"
 #include "rendermode.h"
@@ -65,48 +66,49 @@ void TileRenderer::setShadowEdges(std::array<uint8_t, 5> shadow_edges) {
 	this->shadow_edges = shadow_edges;
 }
 
-TileRenderer::cmpBlockPos* TileRenderer::getTileComparator() const {
-	switch ((RenderRotation::Direction)render_view->getRotation()){
+template<typename IT>
+static void sortTiles(IT begin, IT end, RenderRotation::Direction dir) {
+	switch (dir){
 	default:
 	case RenderRotation::TOP_LEFT:
-		return [](const TileImage& a, const TileImage& b) -> bool {
+		std::sort(begin, end, [](const TileImage* a, const TileImage* b) -> bool {
 			return
-				(a.pos.y != b.pos.y) ? (a.pos.y < b.pos.y) : (
-				(a.pos.z != b.pos.z) ? (a.pos.z < b.pos.z) : (
-				(a.pos.x != b.pos.x) ? (a.pos.x > b.pos.x) : (
+				(a->pos.y != b->pos.y) ? (a->pos.y < b->pos.y) : (
+				(a->pos.z != b->pos.z) ? (a->pos.z < b->pos.z) : (
+				(a->pos.x != b->pos.x) ? (a->pos.x > b->pos.x) : (
 					false
 				)));
-		};
+		});
 		break;
 	case RenderRotation::TOP_RIGHT:
-		return [](const TileImage& a, const TileImage& b) -> bool {
+		std::sort(begin, end, [](const TileImage* a, const TileImage* b) -> bool {
 			return
-				(a.pos.y != b.pos.y) ? (a.pos.y < b.pos.y) : (
-				(a.pos.x != b.pos.x) ? (a.pos.x < b.pos.x) : (
-				(a.pos.z != b.pos.z) ? (a.pos.z < b.pos.z) : (
+				(a->pos.y != b->pos.y) ? (a->pos.y < b->pos.y) : (
+				(a->pos.x != b->pos.x) ? (a->pos.x < b->pos.x) : (
+				(a->pos.z != b->pos.z) ? (a->pos.z < b->pos.z) : (
 					false
 				)));
-		};
+		});
 		break;
 	case RenderRotation::BOTTOM_RIGHT:
-		return [](const TileImage& a, const TileImage& b) -> bool {
+		std::sort(begin, end, [](const TileImage* a, const TileImage* b) -> bool {
 			return
-				(a.pos.y != b.pos.y) ? (a.pos.y < b.pos.y) : (
-				(a.pos.z != b.pos.z) ? (a.pos.z > b.pos.z) : (
-				(a.pos.x != b.pos.x) ? (a.pos.x < b.pos.x) : (
+				(a->pos.y != b->pos.y) ? (a->pos.y < b->pos.y) : (
+				(a->pos.z != b->pos.z) ? (a->pos.z > b->pos.z) : (
+				(a->pos.x != b->pos.x) ? (a->pos.x < b->pos.x) : (
 					false
 				)));
-		};
+		});
 		break;
 	case RenderRotation::BOTTOM_LEFT:
-		return [](const TileImage& a, const TileImage& b) -> bool {
+		std::sort(begin, end, [](const TileImage* a, const TileImage* b) -> bool {
 			return
-				(a.pos.y != b.pos.y) ? (a.pos.y < b.pos.y) : (
-				(a.pos.x != b.pos.x) ? (a.pos.x > b.pos.x) : (
-				(a.pos.z != b.pos.z) ? (a.pos.z > b.pos.z) : (
+				(a->pos.y != b->pos.y) ? (a->pos.y < b->pos.y) : (
+				(a->pos.x != b->pos.x) ? (a->pos.x > b->pos.x) : (
+				(a->pos.z != b->pos.z) ? (a->pos.z > b->pos.z) : (
 					false
 				)));
-		};
+		});
 		break;
 	}
 }
@@ -117,10 +119,16 @@ void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 	boost::container::vector<TileImage> tile_images;
 	renderTopBlocks(tile_pos, tile_images);
 
-	// Sort them in order depending of the rotation
-	boost::range::sort(tile_images, getTileComparator());
+    size_t count = tile_images.size();
+    std::vector<TileImage*> tile_image_pointers(count);
+    for (size_t i = 0; i < count; i++) {
+        tile_image_pointers[i] = &tile_images[i];
+    }
 
-	for (auto it = tile_images.begin(); it != tile_images.end(); ++it) {
+	// Sort them in order depending of the rotation
+	sortTiles(tile_image_pointers.begin(), tile_image_pointers.end(), (RenderRotation::Direction)render_view->getRotation());
+
+	for (auto it : tile_image_pointers) {
 		tile.alphaBlit(it->image, it->x, it->y);
 	}
 }
