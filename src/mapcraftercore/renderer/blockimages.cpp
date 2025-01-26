@@ -528,6 +528,9 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 		std::string first_line;
 		std::getline(in, first_line);
 	}
+
+    std::set<uint32_t> all_image_uv_indices;
+
 	int lineno = 2;
 	for (std::string line; std::getline(in, line); lineno++) {
 		line = util::trim(line);
@@ -569,6 +572,8 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 		block.image(image_index);
 		block.uv_image(image_uv_index);
 		block.weight_image(image_weight, weight_factor);
+
+        all_image_uv_indices.insert(image_uv_index.begin(), image_uv_index.end());
 
 		block.is_biome = block_info.count("biome_type");
 		if (block.is_biome) {
@@ -628,6 +633,36 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 		//std::cout << block_name << " " << variant << std::endl;
 	}
 	in.close();
+
+    for (uint32_t image_uv_index : all_image_uv_indices) {
+        const RGBAImage& image = BlockAtlas::instance().GetImage(image_uv_index);
+        int n = image.getWidth() * image.getHeight();
+
+        for (int i = 0; i < n; i++) {
+            auto& pixel = image.data[i];
+            if (rgba_alpha(pixel) == 0) {
+                if (pixel != 0) {
+                    throw std::invalid_argument("uv texture contains non-zero transparent pixel!");
+                }
+            } else {
+                uint8_t face;
+                switch (rgba_blue(pixel)) {
+                    case FACE_LEFT_COLOR:
+                        face = FACE_LEFT_INDEX;
+                        break;
+                    case FACE_RIGHT_COLOR:
+                        face = FACE_RIGHT_INDEX;
+                        break;
+                    case FACE_UP_COLOR:
+                        face = FACE_UP_INDEX;
+                        break;
+                    default:
+                        throw std::invalid_argument("uv texture contains invalid face index!");
+                }
+                pixel = rgba(rgba_red(pixel), rgba_green(pixel), face, rgba_alpha(pixel));
+            }
+        }
+    }
 
 	prepareBlockImages();
 	//runBenchmark();
