@@ -248,7 +248,7 @@ void RGBAImage::fill(RGBAPixel color, int x, int y, int w, int h) {
 }
 
 void RGBAImage::clear() {
-	std::fill(data.begin(), data.end(), 0);
+	std::fill(begin(), end(), 0);
 }
 
 RGBAImage RGBAImage::clip(int x, int y, int width, int height) const {

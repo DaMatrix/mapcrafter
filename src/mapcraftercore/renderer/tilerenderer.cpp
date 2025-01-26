@@ -113,10 +113,24 @@ static void sortTiles(IT begin, IT end, RenderRotation::Direction dir) {
 	}
 }
 
+namespace {
+    class max_statistic {
+        const char* name;
+        size_t i = 0;
+
+    public:
+        max_statistic(const char* name) : name(name) {}
+
+        void update(size_t i) { this->i = std::max(i, this->i); }
+        ~max_statistic() { LOG(INFO) << "[" << name << "]: " << i; }
+    };
+}
+
 void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 	tile.setSize(getTileWidth(), getTileHeight());
 
 	boost::container::vector<TileImage> tile_images;
+    tile_images.reserve(80000);
 	renderTopBlocks(tile_pos, tile_images);
 
     size_t count = tile_images.size();
@@ -131,6 +145,9 @@ void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 	for (auto it : tile_image_pointers) {
 		tile.alphaBlit(it->image, it->x, it->y);
 	}
+
+    static thread_local max_statistic maxCount("maximum tile_images size");
+    maxCount.update(tile_images.size());
 }
 
 int TileRenderer::getTileWidth() const {
@@ -262,7 +279,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 					tile_image.image.data[i] = p;
 				}
 			} else {
-				std::copy(image.data.begin(), image.data.end(), tile_image.image.data.begin());
+                tile_image.image = image;
 			}
 
 			if (block_image->is_biome) {
@@ -302,7 +319,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 
 		} else {
 			// Clear out the tile from previous rendering
-			std::fill(tile_image.image.data.begin(), tile_image.image.data.end(), 0);
+            tile_image.image.clear();
 		}
 
 
@@ -326,10 +343,10 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			float light = std::max(block.sky_light, block.block_light) / 15.0f;
 			biome_color = rgba(rgba_red(biome_color) * light, rgba_green(biome_color) * light, rgba_blue(biome_color) * light, (render_view->getWaterOpacity() * 255));
 
-			std::vector<RGBAPixel>::const_iterator pit      = waterlog->data.begin();
-			std::vector<RGBAPixel>::const_iterator pitend   = waterlog->data.end();
-			std::vector<RGBAPixel>::const_iterator puvit    = waterlog_uv->data.begin();
-			std::vector<RGBAPixel>::iterator pdestit        = waterLogTinted.data.begin();
+			auto pit      = waterlog->begin();
+			auto pitend   = waterlog->end();
+			auto puvit    = waterlog_uv->begin();
+			auto pdestit        = waterLogTinted.begin();
 
 			if ((water_top || water_south || water_west) == false) {
 				// fast lane

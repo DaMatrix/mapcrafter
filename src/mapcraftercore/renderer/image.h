@@ -25,7 +25,10 @@
 #include <math.h> // to be sure M_PI is defined
 
 #include <png.h>
+
+#include <algorithm> //std::copy_n()
 #include <cstdint>
+#include <memory> //std::unique_ptr
 #include <string>
 #include <tuple>
 #include <vector>
@@ -115,7 +118,22 @@ template <typename Pixel>
 class Image {
 public:
 	Image(int width = 0, int height = 0);
+    Image(const Image& src) : width(src.width), height(src.height), data(new Pixel[src.width * src.height]) {
+        std::copy_n(src.begin(), width * height, begin());
+    }
 	~Image();
+
+    Image& operator=(const Image& src) {
+        if (&src != this) {
+            if (src.width * src.height != width * height) {
+                data.reset(new Pixel[src.width * src.height]);
+            }
+            width = src.width;
+            height = src.height;
+            std::copy_n(src.begin(), width * height, begin());
+        }
+        return *this;
+    }
 
 	int getWidth() const;
 	int getHeight() const;
@@ -133,7 +151,13 @@ public:
 	int width;
 	int height;
 
-	std::vector<Pixel> data;
+	std::unique_ptr<Pixel[]> data;
+
+    Pixel* begin() { return data.get(); }
+    Pixel* end() { return data.get() + (width * height); }
+
+    const Pixel* begin() const { return data.get(); }
+    const Pixel* end() const { return data.get() + (width * height); }
 };
 
 const int ROTATE_0 = 0;
@@ -225,9 +249,7 @@ public:
 
 template <typename Pixel>
 Image<Pixel>::Image(int width, int height)
-	:width(width), height(height) {
-	data.resize(width * height);
-}
+	:width(width), height(height), data(new Pixel[width * height]()) {}
 
 template <typename Pixel>
 Image<Pixel>::~Image() {
@@ -270,9 +292,11 @@ Pixel& Image<Pixel>::pixel(int x, int y) {
 template <typename Pixel>
 void Image<Pixel>::setSize(int width, int height) {
 	if ((width!=this->width) || (height!=this->height)) {
+        if (width * height != this->width * this->height) {
+            data.reset(new Pixel[width * height]());
+        }
 		this->width = width;
 		this->height = height;
-		data.resize(width * height);
 	}
 }
 
