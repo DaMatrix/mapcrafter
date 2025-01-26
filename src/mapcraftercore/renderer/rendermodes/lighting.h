@@ -20,6 +20,7 @@
 #ifndef RENDERMODES_LIGHTING_H_
 #define RENDERMODES_LIGHTING_H_
 
+#include "../blockimages.h" // mapcrafter::LightFnc
 #include "../rendermode.h"
 
 #include <array>
@@ -101,7 +102,7 @@ private:
 	double lighting_intensity, lighting_water_intensity;
 	bool simulate_sun_light;
 	FaceCorners CORNERS_LEFT, CORNERS_RIGHT, CORNERS_TOP, CORNERS_BOTTOM;
-	uint8_t light_func[256];
+	LightFnc light_func; //TODO: this could be made into a global constant
 
 	/**
 	 * Calculates the color of the light of a block.

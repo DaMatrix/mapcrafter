@@ -10,6 +10,7 @@ option(OPT_LINK_DEPS_STATICALLY "Links all dependencies (libpng, libjpeg, boost.
 option(OPT_LINK_BOOST_STATICALLY "Links boost statically" OFF)
 option(OPT_BOOST_STATIC "Links boost statically (deprecated, use OPT_LINK_BOOST_STATICALLY)" OFF)
 option(OPT_INSTALL_HEADERS "Installs libmapcraftercore header files" ON)
+option(OPT_AUTO_SIMD "If supported, generate function variants with support for multiple SIMD levels. Disable this if compiling for a specific target architecture (e.g. -march=native)" ON)
 
 set(CMAKE_MACOSX_RPATH 1)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
@@ -33,6 +34,9 @@ else()
 endif()
 if(OPT_PROFILE)
     add_definitions(-pg)
+endif()
+if (OPT_AUTO_SIMD)
+    add_definitions(-DMAPCRAFTER_AUTO_SIMD=1)
 endif()
 
 add_definitions(-Wall)

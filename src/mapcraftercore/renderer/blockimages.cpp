@@ -163,109 +163,140 @@ inline uint32_t mix(uint32_t x, uint32_t y, uint32_t a) {
 
 }
 
+static std::array<uint32_t, 3> blockImageMultiply_PreprocessFactors(
+        const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up) {
+    std::array<uint32_t, 3> f{};
+	for (int i = 0; i < 4; i++) {
+		f[FACE_LEFT_INDEX] |= uint8_t(std::min(255.0f, (factors_left[i] * 255u))) << (i * 8);
+		f[FACE_RIGHT_INDEX] |= uint8_t(std::min(255.0f, (factors_right[i] * 255u))) << (i * 8);
+		f[FACE_UP_INDEX] |= uint8_t(std::min(255.0f, (factors_up[i] * 255u))) << (i * 8);
+	}
+    return f;
+}
+
+static void blockImageMultiply_scalar(
+        RGBAPixel* block, const RGBAPixel* uv_mask, int i, int n,
+        const std::array<uint32_t, 3>& f, const LightFnc& light_fnc) {
+	for (; i < n; i++) {
+        uint32_t pixel = block[i];
+        uint32_t uv_pixel = uv_mask[i];
+        if (uv_pixel != 0) {
+            uint32_t u = rgba_red(uv_pixel);
+            uint32_t v = rgba_green(uv_pixel);
+            uint32_t side = rgba_blue(uv_pixel);
+
+            uint32_t fv = f[side];
+
+            // jetzt sogar 34.17
+            // und mit noch mehr rgba_multiply sogar 35.28
+            uint32_t ab = mix((fv >> (0 * 8)) & 0xFF, (fv >> (1 * 8)) & 0xFF, u); // divide255((255-u) * f[0], u * f[1]);
+            uint32_t cd = mix((fv >> (2 * 8)) & 0xFF, (fv >> (3 * 8)) & 0xFF, u); // divide255((255-u) * f[2], u * f[3]);
+            uint32_t x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
+
+            // apply light function
+            x = light_fnc[x];
+
+            pixel = rgba_multiply_scalar(pixel, x);
+        }
+        block[i] = pixel;
+	}
+}
+
+#if MAPCRAFTER_SIMD && __x86_64__ && (__AVX2__ || (MAPCRAFTER_AUTO_SIMD && __has_attribute(target)))
+
+#if !__AVX2__
+#define ATTRIBUTE_TARGET_AVX2 __attribute__((target("avx2")))
+#define ATTRIBUTE_TARGET_DEFAULT __attribute__((target("default")))
+#else
+#define ATTRIBUTE_TARGET_AVX2
+#define ATTRIBUTE_TARGET_DEFAULT
+#endif
+
+ATTRIBUTE_TARGET_AVX2
+static int blockImageMultiply_AVX2(
+        RGBAPixel* block, const RGBAPixel* uv_mask, int i, int n,
+        const std::array<uint32_t, 3>& f, const LightFnc& light_fnc) {
+    using uint32x8 = simd::vec<uint32_t, 8>;
+
+    auto mix = [](uint32x8 x, uint32x8 y, uint32x8 a) ATTRIBUTE_TARGET_AVX2 -> uint32x8 {
+        // >> 8 = / 256, serves as approximation for division by 255
+        return ((x * (255 - a)) + (y * a)) >> 8;
+    };
+
+    auto rgba_multiply_scalar = [](uint32x8 value, uint32x8 factor) ATTRIBUTE_TARGET_AVX2 -> uint32x8 {
+        uint32x8 g = ((((value & 0xff00) + 0x0100) * factor) >> 8) & 0xff00;
+        uint32x8 br = ((((value & 0xff00ff) + 0x010001) * factor) >> 8) & 0xff00ff;
+        uint32x8 a = value & 0xff000000;
+        return a | g | br;
+    };
+
+    uint32x8 f_lookup = { f[0], f[1], f[2], 0, 0, 0, 0, 0 };
+
+    for (; i < n - 7; i += 8) {
+        uint32x8 pixel = (uint32x8) _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&block[i]));
+        uint32x8 uv_pixel = (uint32x8) _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&uv_mask[i]));
+
+        if (_mm256_testz_si256((__m256i) uv_pixel, (__m256i) uv_pixel)) { //all pixels are zero
+            continue;
+        }
+
+        uint32x8 u = uv_pixel & 0xFF;
+        uint32x8 v = (uv_pixel >> 8) & 0xFF;
+        uint32x8 side = (uv_pixel >> 16) & 0xFF;
+
+        uint32x8 fv = (uint32x8) _mm256_permutevar8x32_epi32((__m256i) f_lookup, (__m256i) side);
+        uint32x8 ab = mix((fv >> (0 * 8)) & 0xFF, (fv >> (1 * 8)) & 0xFF, u); // divide255((255-u) * f[0], u * f[1]);
+        uint32x8 cd = mix((fv >> (2 * 8)) & 0xFF, (fv >> (3 * 8)) & 0xFF, u); // divide255((255-u) * f[2], u * f[3]);
+        uint32x8 x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
+
+        // apply light function
+        x = (uint32x8) _mm256_i32gather_epi32(reinterpret_cast<const int*>(light_fnc.data()), (__m256i) x, 4);
+
+        pixel = uv_pixel != 0 ? rgba_multiply_scalar(pixel, x) : pixel;
+
+#ifndef NDEBUG
+        //call the scalar function on this block of 8 values and check that the result matches
+        blockImageMultiply_scalar(block + i, uv_mask + i, 0, 8, f, light_fnc);
+        assert(std::memcmp(block + i, &pixel, sizeof(pixel)) == 0);
+#endif
+
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(&block[i]), (__m256i) pixel);
+	}
+
+    return i;
+}
+
+ATTRIBUTE_TARGET_AVX2
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
-		const uint8_t *light_fnc) {
+		const LightFnc& light_fnc) {
+	assert(block.getWidth() == uv_mask.getWidth() && block.getHeight() == uv_mask.getHeight());
+
+    std::array<uint32_t, 3> f = blockImageMultiply_PreprocessFactors(factors_left, factors_right, factors_up);
+
+	int n = block.getWidth() * block.getHeight();
+    int i = 0;
+
+    //vectorized element processing
+    i = blockImageMultiply_AVX2(&block.data[0], &uv_mask.data[0], i, n, f, light_fnc);
+
+    //process remaining elements
+    blockImageMultiply_scalar(&block.data[0], &uv_mask.data[0], i, n, f, light_fnc);
+}
+
+ATTRIBUTE_TARGET_DEFAULT
+#endif
+void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
+		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
+		const LightFnc& light_fnc) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
-	uint32_t fl[4], fr[4], fu[4];
-	for (int i = 0; i < 4; i++) {
-		fl[i] = std::min(255u, (uint32_t)(factors_left[i] * 255u));
-		fr[i] = std::min(255u, (uint32_t)(factors_right[i] * 255u));
-		fu[i] = std::min(255u, (uint32_t)(factors_up[i] * 255u));
-	}
-
+    std::array<uint32_t, 3> f = blockImageMultiply_PreprocessFactors(factors_left, factors_right, factors_up);
 
 	int n = block.getWidth() * block.getHeight();
-	for (int i = 0; i < n; i++) {
-		uint32_t& pixel = block.data[i];
-		uint32_t uv_pixel = uv_mask.data[i];
-		if (rgba_alpha(uv_pixel) == 0) {
-			continue;
-		}
 
-		//const CornerValues* vptr = nullptr;
-		uint32_t* f = nullptr;
-		uint8_t side = rgba_blue(uv_pixel);
-		if (side == FACE_LEFT_INDEX) {
-			//vptr = &factors_left;
-			f = fl;
-		} else if (side == FACE_RIGHT_INDEX) {
-			//vptr = &factors_right;
-			f = fr;
-		} else if (side == FACE_UP_INDEX) {
-			//vptr = &factors_up;
-			f = fu;
-		} else {
-			continue;
-		}
-
-		/*
-		const CornerValues& values = *vptr;
-		float u = (float) rgba_red(uv_pixel) / 255.0;
-		float v = (float) rgba_green(uv_pixel) / 255.0;
-		float ab = (1-u) * values[0] + u * values[1];
-		float cd = (1-u) * values[2] + u * values[3];
-		float x = (1-v) * ab + v * cd;
-		*/
-
-		uint32_t u = rgba_red(uv_pixel);
-		uint32_t v = rgba_green(uv_pixel);
-
-		//uint32_t ab = divide255((255-u), f[0]) + divide255(u, f[1]);
-		//uint32_t cd = divide255((255-u), f[2]) + divide255(u, f[3]);
-		//uint32_t x = divide255((255-v), ab) + divide255(v,  cd);
-
-		// jetzt sogar 34.17
-		// und mit noch mehr rgba_multiply sogar 35.28
-		uint32_t ab = mix(f[0], f[1], u); // divide255((255-u) * f[0], u * f[1]);
-		uint32_t cd = mix(f[2], f[3], u); // divide255((255-u) * f[2], u * f[3]);
-		uint32_t x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
-
-		// apply light function 
-		x = light_fnc[x];
-
-		// OHNE BASIS
-		// 45.68
-		//pixel = rgba_multiply(pixel, 0.5);
-
-		// 34.44
-		//float x = 0.5;
-		//pixel = rgba_multiply(pixel, x, x, x);
-
-		// FLOAT ALS BASIS
-		// 25.68
-		//pixel = rgba_multiply(pixel, x, x, x);
-
-		// geht. aber vielleicht auch nicht mega viel schneller
-		//uint8_t factor = x * 255;
-		//pixel = rgba_multiply(pixel, factor, factor, factor);
-
-		// geht, 29.13
-		//int factor = x * 255;
-		//assert(factor >= 0 && factor <= 255);
-		//pixel = rgba_multiply(pixel, factor);
-
-		// INTEGER ALS BASIS
-		//assert(x >= 0 && x <= 255);
-
-		// geht, 28.93
-		//double factor = (double) x / 255;
-		//pixel = rgba_multiply(pixel, factor, factor, factor);
-
-		// geht, 28.00
-		//uint8_t factor = x;
-		//pixel = rgba_multiply(pixel, factor, factor, factor);
-
-		// geht, 29.83
-		// ohne uv-alpha check sogar 32.15
-		// ohne uv-alpha check und uint8_t 32.39
-		// ... div255 32.60
-		// ... anderes div255 32.88
-		// rgba_ inline: 33.64
-		pixel = rgba_multiply_scalar(pixel, x);
-	}
+    blockImageMultiply_scalar(&block.data[0], &uv_mask.data[0], 0, n, f, light_fnc);
 }
 
 void blockImageMultiply(RGBAImage& block, uint8_t factor) {
@@ -295,11 +326,10 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask, uint32_t color) {
 
 void blockImageTint(RGBAImage& block, uint32_t color) {
 	int n = block.getWidth() * block.getHeight();
+    //trivially vectorizable loop
 	for (int i = 0; i < n; i++) {
 		uint32_t pixel = block.data[i];
-		if(rgba_alpha(pixel)) {
-			block.data[i] = rgba_multiply(pixel, color);
-		}
+        block.data[i] = rgba_alpha(pixel) ? rgba_multiply(pixel, color) : pixel;
 	}
 }
 
@@ -831,7 +861,7 @@ void RenderedBlockImages::runBenchmark() {
 	CornerValues left = {1.0, 0.8, 0.5, 1.0};
 	CornerValues right = {1.0, 0.6, 0.3, 0.8};
 	CornerValues up = {0.5, 1.0, 0.6, 0.8};
-	uint8_t light_fnc[256] = {};
+	std::array<uint32_t, 256> light_fnc = {};
 
 	std::chrono::time_point<clock_> begin = clock_::now();
 	const RGBAImage& image = solid.image(0);

@@ -16,6 +16,7 @@ set(HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/other.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/picojson.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/progress.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/simd.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/terminal.h"
     PARENT_SCOPE
 )

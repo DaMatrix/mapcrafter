@@ -133,9 +133,9 @@ LightingRenderMode::LightingRenderMode(bool day, double lighting_intensity,
 	  simulate_sun_light(simulate_sun_light) {
 
 	// Pre-process the lighting functions
-	for (int x = 0; x < sizeof(light_func); x++) {
+	for (int x = 0; x < light_func.size(); x++) {
 		float c = float(x) / 255.0f;
-		light_func[x] = int(255.0f * std::min(1.0f, powf(c * 1.2f, 1.4f)));
+		light_func[x] = int32_t(255.0f * std::min(1.0f, powf(c * 1.2f, 1.4f)));
 	}
 }
 

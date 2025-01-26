@@ -23,6 +23,7 @@
 #include "blockatlas.h"
 #include "image.h"
 #include "../mc/pos.h"
+#include "../util/simd.h"
 
 #include <boost/filesystem.hpp>
 #include <array>
@@ -74,17 +75,30 @@ public:
 };
 
 typedef std::array<float, 4> CornerValues;
+typedef std::array<uint32_t, 256> LightFnc;
 
 void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask);
 void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
 		uint8_t except_face, float factor);
+
+#if MAPCRAFTER_SIMD && __x86_64__ && !__AVX2__ && MAPCRAFTER_AUTO_SIMD && __has_attribute(target)
+__attribute__((target("avx2")))
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
-		const uint8_t *light_fnc);
+		const LightFnc& light_fnc);
+__attribute__((target("default")))
+#endif
+void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
+		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
+		const LightFnc& light_fnc);
+
+MAPCRAFTER_TARGET_CLONES
 void blockImageMultiply(RGBAImage& block, uint8_t factor);
 void blockImageTint(RGBAImage& block, const RGBAImage& mask,
 		uint32_t color);
+
 // TODO maybe this should be named something with multiply too
+MAPCRAFTER_TARGET_CLONES
 void blockImageTint(RGBAImage& block, uint32_t color);
 void blockImageTintHighContrast(RGBAImage& block, uint32_t color);
 void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int face, uint32_t color);
