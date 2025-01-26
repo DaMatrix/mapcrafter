@@ -106,12 +106,11 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 	return true;
 }
 
-std::shared_ptr<const RGBAImage> const BlockAtlas::GetImage(uint32_t idx) {
-	if (idx < 0 || idx >= this->block_count) {
-		LOG(ERROR) << "Block atlas doesn't match image index file ";
-		return this->unknown_block;
+const RGBAImage& BlockAtlas::GetImage(uint32_t idx) {
+	if (idx >= this->block_count) {
+		throw std::runtime_error("Block atlas doesn't match image index file");
 	}
-	return this->block_ptrs[idx];
+	return *this->block_ptrs[idx];
 }
 
 void BlockAtlas::ShadeBlock(int idx, int uv_idx, float factor_left, float factor_right, float factor_up) {

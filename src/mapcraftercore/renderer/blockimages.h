@@ -146,14 +146,14 @@ struct BlockImage {
 
 	const RGBAImage& image(int32_t idx) const {
 		assert(idx<(int32_t)images_idx.size());
-		return *(BlockAtlas::instance().GetImage(images_idx[idx]));
+		return BlockAtlas::instance().GetImage(images_idx[idx]);
 	}
 	void image(std::vector<uint32_t>& indexes) {
 		images_idx = indexes;
 	}
 	const RGBAImage& uv_image(int32_t idx) const {
 		assert(idx<(int32_t)images_idx.size());
-		return *(BlockAtlas::instance().GetImage(uv_images_idx[idx]));
+		return BlockAtlas::instance().GetImage(uv_images_idx[idx]);
 	}
 	void uv_image(std::vector<uint32_t>& indexes) {
 		uv_images_idx = indexes;
