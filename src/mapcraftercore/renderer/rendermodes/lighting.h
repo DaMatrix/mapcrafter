@@ -102,7 +102,6 @@ private:
 	double lighting_intensity, lighting_water_intensity;
 	bool simulate_sun_light;
 	FaceCorners CORNERS_LEFT, CORNERS_RIGHT, CORNERS_TOP, CORNERS_BOTTOM;
-	LightFnc light_func; //TODO: this could be made into a global constant
 
 	/**
 	 * Calculates the color of the light of a block.

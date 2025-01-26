@@ -30,6 +30,10 @@
 namespace mapcrafter {
 namespace renderer {
 
+static const LightFnc DEFAULT_LIGHT_FNC = LightFnc([](float c) -> uint8_t {
+    return uint8_t(255.0f * std::min(1.0f, powf(c * 1.2f, 1.4f)));
+});
+
 CornerNeighbors::CornerNeighbors() {
 }
 
@@ -131,14 +135,7 @@ LightingRenderMode::LightingRenderMode(bool day, double lighting_intensity,
 	: day(day), lighting_intensity(lighting_intensity),
 	  lighting_water_intensity(lighting_water_intensity),
 	  simulate_sun_light(simulate_sun_light) {
-
-	// Pre-process the lighting functions
-	for (int x = 0; x < light_func.size(); x++) {
-		float c = float(x) / 255.0f;
-		light_func[x] = int32_t(255.0f * std::min(1.0f, powf(c * 1.2f, 1.4f)));
-	}
 }
-
 
 LightingRenderMode::~LightingRenderMode() {
 }
@@ -195,7 +192,7 @@ void LightingRenderMode::draw(RGBAImage& image, const BlockImage& block_image,
 	} else if (block_image.lighting_type == LightingType::SMOOTH_TOP_REMAINING_SIMPLE) {
 		CornerValues id = {1.0, 1.0, 1.0, 1.0};
 		CornerValues up = getCornerColors(pos, CORNERS_TOP, intensity);
-			blockImageMultiply(image, block_image.uv_image(0), id, id, up, light_func);
+			blockImageMultiply(image, block_image.uv_image(0), id, id, up, DEFAULT_LIGHT_FNC);
 
 		float factor = getLightingColor(pos, intensity);
 		blockImageMultiplyExcept(image, block_image.uv_image(0), FACE_UP_INDEX, factor);
@@ -203,7 +200,7 @@ void LightingRenderMode::draw(RGBAImage& image, const BlockImage& block_image,
 		CornerValues left = getCornerColors(pos, CORNERS_LEFT, intensity);
 		CornerValues right = getCornerColors(pos, CORNERS_RIGHT, intensity);
 		CornerValues bottom = getCornerColors(pos, CORNERS_BOTTOM, intensity);
-			blockImageMultiply(image, block_image.uv_image(0), left, right, bottom, light_func);
+			blockImageMultiply(image, block_image.uv_image(0), left, right, bottom, DEFAULT_LIGHT_FNC);
 	}
 }
 
@@ -298,7 +295,7 @@ void LightingRenderMode::doSmoothLight(RGBAImage& image, const BlockImage& block
 		up = getCornerColors(pos, use_bottom_corners ? CORNERS_BOTTOM : CORNERS_TOP,
 				under_water[2] ? lighting_water_intensity : lighting_intensity);
 	}
-	blockImageMultiply(image, block_image.uv_image(0), left, right, up, light_func);
+	blockImageMultiply(image, block_image.uv_image(0), left, right, up, DEFAULT_LIGHT_FNC);
 }
 
 void LightingRenderMode::doSimpleLight(RGBAImage& image, const BlockImage& block_image,

@@ -194,7 +194,7 @@ static void blockImageMultiply_scalar(
             uint32_t x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
 
             // apply light function
-            x = light_fnc[x];
+            x = light_fnc.lookup_u8[x];
 
             pixel = rgba_multiply_scalar(pixel, x);
         }
@@ -250,7 +250,7 @@ static int blockImageMultiply_AVX2(
         uint32x8 x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
 
         // apply light function
-        x = (uint32x8) _mm256_i32gather_epi32(reinterpret_cast<const int*>(light_fnc.data()), (__m256i) x, 4);
+        x = (uint32x8) _mm256_i32gather_epi32(reinterpret_cast<const int*>(light_fnc.lookup_u32.data()), (__m256i) x, 4);
 
         pixel = uv_pixel != 0 ? rgba_multiply_scalar(pixel, x) : pixel;
 
@@ -861,7 +861,7 @@ void RenderedBlockImages::runBenchmark() {
 	CornerValues left = {1.0, 0.8, 0.5, 1.0};
 	CornerValues right = {1.0, 0.6, 0.3, 0.8};
 	CornerValues up = {0.5, 1.0, 0.6, 0.8};
-	std::array<uint32_t, 256> light_fnc = {};
+	static const LightFnc light_fnc = {};
 
 	std::chrono::time_point<clock_> begin = clock_::now();
 	const RGBAImage& image = solid.image(0);

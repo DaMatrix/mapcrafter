@@ -75,7 +75,27 @@ public:
 };
 
 typedef std::array<float, 4> CornerValues;
-typedef std::array<uint32_t, 256> LightFnc;
+
+struct LightFnc {
+    std::array<uint8_t, 256> lookup_u8;
+    std::array<uint32_t, 256> lookup_u32;
+
+    LightFnc() = default;
+
+    template<typename G>
+    explicit LightFnc(G generator) {
+        static_assert(
+                std::is_same<decltype(generator(0.0f)), uint8_t>::value,
+                "generator function must return a uint8_t");
+
+	    // Pre-process the lighting functions
+        for (int x = 0; x < 256; x++) {
+            uint8_t value = generator(float(x) / 255.0f);
+            lookup_u8[x] = value;
+            lookup_u32[x] = value;
+        }
+    }
+};
 
 void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask);
 void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
