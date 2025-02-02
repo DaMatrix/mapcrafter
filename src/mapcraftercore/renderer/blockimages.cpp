@@ -206,10 +206,8 @@ static void blockImageMultiply_scalar(
 
 #if !__AVX2__
 #define ATTRIBUTE_TARGET_AVX2 __attribute__((target("avx2")))
-#define ATTRIBUTE_TARGET_DEFAULT __attribute__((target("default")))
 #else
 #define ATTRIBUTE_TARGET_AVX2
-#define ATTRIBUTE_TARGET_DEFAULT
 #endif
 
 ATTRIBUTE_TARGET_AVX2
@@ -283,8 +281,11 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
     //process remaining elements
     blockImageMultiply_scalar(&block.data[0], &uv_mask.data[0], i, n, f, light_fnc);
 }
+#endif
 
-ATTRIBUTE_TARGET_DEFAULT
+#if !MAPCRAFTER_SIMD || !__x86_64__ || !__AVX2__
+#if MAPCRAFTER_SIMD && __x86_64__ && !__AVX2__ && MAPCRAFTER_AUTO_SIMD && __has_attribute(target)
+__attribute__((target("default")))
 #endif
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
@@ -298,6 +299,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 
     blockImageMultiply_scalar(&block.data[0], &uv_mask.data[0], 0, n, f, light_fnc);
 }
+#endif
 
 void blockImageMultiply(RGBAImage& block, uint8_t factor) {
 	int n = block.getWidth() * block.getHeight();
