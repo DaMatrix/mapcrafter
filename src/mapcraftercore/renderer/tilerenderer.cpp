@@ -178,7 +178,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 		// get local block position
 		mc::LocalBlockPos local(top);
 
-		uint16_t id = current_chunk->getBlockID(local, false);
+		uint16_t id = current_chunk->getBlockID<false>(local);
 		if (id == mc::Chunk::nop_id) continue;
 		// const mc::BlockState& bs = block_registry.getBlockState(id);
 		const BlockImage* block_image = &block_images->getBlockImage(id);
@@ -190,7 +190,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 		}
 
 		// What's on each side ?
-		uint16_t id_top   = current_chunk->getBlockID(mc::LocalBlockPos(local.x,local.z,local.y+1), true);
+		uint16_t id_top   = current_chunk->getBlockID<true>(mc::LocalBlockPos(local.x,local.z,local.y+1));
 		uint16_t id_south = getBlock(top + render_view->getRotation().getSouth()).id;
 		uint16_t id_west  = getBlock(top + render_view->getRotation().getWest()).id;
 

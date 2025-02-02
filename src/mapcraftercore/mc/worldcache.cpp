@@ -146,7 +146,7 @@ Block WorldCache::getBlock(const mc::BlockPos& pos, const mc::Chunk* chunk, int 
 		Block block;
 		block.pos = pos;
 		if (get & GET_ID) {
-			block.id = mychunk->getBlockID(local, true);
+			block.id = mychunk->getBlockID<true>(local);
 			block.fields_set |= GET_ID;
 		}
 		if (get & GET_BIOME) {

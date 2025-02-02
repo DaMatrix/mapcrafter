@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <array>
+#include <optional>
 #include <unordered_map>
 
 namespace mapcrafter {
@@ -37,25 +38,23 @@ class BlockStateRegistry;
 const int CHUNK_LOWEST = -4;	// Included
 const int CHUNK_HIGHEST = 20;	// Excluded
 const int Y_CHUNKS_PER_REGION_FILE = 24;	// Number of chunksection in a chunk (to date)
-const int OUT_OF_WORLD_LIGHT = 10;	// Lighting value for shading side of the world
+const uint8_t OUT_OF_WORLD_LIGHT = 10;	// Lighting value for shading side of the world
 
 struct BlockSkyLight {
 	uint8_t block_light : 4;
 	uint8_t sky_light : 4;
+
+	BlockSkyLight() = default;
+	BlockSkyLight(uint8_t block_light, uint8_t sky_light) : block_light(block_light), sky_light(sky_light) {}
 };
 
 /**
  * A 16x16x16 section of a chunk.
  */
 struct ChunkSection {
-	std::array<uint8_t, 16 * 16 * 8> block_light;
-	std::array<uint8_t, 16 * 16 * 8> sky_light;
+	std::array<BlockSkyLight, 16 * 16 * 16> light;
 	std::array<uint16_t, 16 * 16 * 16> block_ids;
 	std::array<uint16_t, 4 * 4 * 4> biomes;
-
-	const std::array<uint8_t, 16 * 16 * 8>& getLightArray(LightKind kind) const {
-		return (&block_light)[kind];
-	}
 };
 
 /**
@@ -99,7 +98,8 @@ public:
 	/**
 	 * Returns the block ID at a specific position (local coordinates).
 	 */
-	uint16_t getBlockID(const LocalBlockPos& pos, bool force = false) const;
+	template<bool FORCE>
+	uint16_t getBlockID(const LocalBlockPos& pos) const;
 
 	/**
 	 * Returns the block sky light at a specific position (local coordinates).
@@ -131,9 +131,7 @@ private:
 	//the array of chunk sections, null for sections which do not exist
 	std::array<std::unique_ptr<ChunkSection>, CHUNK_HIGHEST-CHUNK_LOWEST> sections;
 
-	// true if at least one section is non-null
-	bool has_any_sections;
-
+	//the light value returned for all chunk sections which are null
 	BlockSkyLight default_light_value;
 
 	/**
@@ -145,6 +143,8 @@ private:
 	 *  2: crop west/est/north/east
 	 */
 	int checkBlockWorldCrop(int x, int z, int y) const;
+
+	void finishRead();
 
 	int positionToKey(int x, int z, int y) const;
 	void insertExtraData(const LocalBlockPos& pos, uint16_t extra_data);

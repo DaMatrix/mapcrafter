@@ -30,6 +30,16 @@
 namespace mapcrafter {
 namespace mc {
 
+static void convertLight(std::array<BlockSkyLight, 16 * 16 * 16> &light,
+						 const std::array<uint8_t, 16 * 16 * 8> &block_light,
+						 const std::array<uint8_t, 16 * 16 * 8> &sky_light) {
+	for (size_t i = 0, j = 0; i < 16 * 16 * 8; i++) {
+		uint8_t b = block_light[i], s = sky_light[i];
+		light[j++] = BlockSkyLight(b & 0xF, s & 0xF);
+		light[j++] = BlockSkyLight((b >> 4) & 0xF, (s >> 4) & 0xF);
+	}
+}
+
 namespace {
 
 void readPackedShorts_v116(const std::vector<int64_t>& data, uint16_t* palette, uint16_t* palette_end) {
@@ -248,35 +258,79 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 			std::fill(section.biomes.begin(), section.biomes.end(), 0);
 		}
 
+		std::array<uint8_t, 16 * 16 * 8> raw_block_light;
 		if (section_tag.hasArray<nbt::TagByteArray>("BlockLight")) {
 			const nbt::TagByteArray& block_light = section_tag.findTag<nbt::TagByteArray>("BlockLight");
-			std::copy(block_light.payload.begin(), block_light.payload.end(), section.block_light.begin());
+			std::copy(block_light.payload.begin(), block_light.payload.end(), raw_block_light.begin());
 		} else {
-			std::fill(section.block_light.begin(), section.block_light.end(), 0);
+			std::fill(raw_block_light.begin(), raw_block_light.end(), 0);
 		}
 
+		std::array<uint8_t, 16 * 16 * 8> raw_sky_light;
 		if (section_tag.hasArray<nbt::TagByteArray>("SkyLight", 2048)) {
 			const nbt::TagByteArray& sky_light = section_tag.findTag<nbt::TagByteArray>("SkyLight");
-			std::copy(sky_light.payload.begin(), sky_light.payload.end(), section.sky_light.begin());
+			std::copy(sky_light.payload.begin(), sky_light.payload.end(), raw_sky_light.begin());
 		} else {
-			std::fill(section.sky_light.begin(), section.sky_light.end(), 0);
+			std::fill(raw_sky_light.begin(), raw_sky_light.end(), 0);
 		}
+
+		convertLight(section.light, raw_block_light, raw_sky_light);
 
 		// add this section to the section list
 		sections.at(y.payload - CHUNK_LOWEST).reset(new ChunkSection(section));
-		has_any_sections = true;
 	}
+
+	finishRead();
+
+	return true;
+}
+
+void Chunk::finishRead() {
+	bool has_any_sections = std::any_of(
+			sections.begin(), sections.end(),
+			[](const std::unique_ptr<ChunkSection> &section) { return section != nullptr; });
 
 	default_light_value.block_light = 0;
 	default_light_value.sky_light = has_any_sections ? 15 : mc::OUT_OF_WORLD_LIGHT;
 
-	return true;
+	//if this chunk goes outside the world bounds at all, we should clip all the non-empty sections
+	//to ensure that all out-of-bounds blocks are set to the correct value
+	if (!chunk_completely_contained || world_crop.isYAxisBounded()) {
+		for (int sectionY = CHUNK_LOWEST; sectionY < CHUNK_HIGHEST; sectionY++) {
+			ChunkSection *cs = sections[sectionY - CHUNK_LOWEST].get();
+			if (cs == nullptr)
+				continue;
+
+			for (int y = 0; y < 16; y++)
+				for (int z = 0; z < 16; z++)
+					for (int x = 0; x < 16; x++) {
+						int crop = checkBlockWorldCrop(x, z, y + sectionY * 16);
+						unsigned index = y * 256 + z * 16 + x;
+
+						//override the light values if this block is out-of-bounds
+						switch (crop) {
+							case 0:
+								break;
+							case 1:
+								cs->light[index] = {0, 15};
+								break;
+							case 2:
+								cs->light[index] = {0, mc::OUT_OF_WORLD_LIGHT};
+								break;
+						}
+
+						//override the block ID if this block is out-of-bounds
+						if (crop != 0) {
+							cs->block_ids[index] = nop_id;
+						}
+					}
+		}
+	}
 }
 
 void Chunk::clear() {
 	for (auto &section : sections)
 		section.release();
-	has_any_sections = false;
 
 	default_light_value.block_light = 0;
 	default_light_value.sky_light = mc::OUT_OF_WORLD_LIGHT;
@@ -296,20 +350,21 @@ const ChunkSection* Chunk::getSection(int y) const {
 	return sections[chunk_idx - CHUNK_LOWEST].get();
 }
 
-uint16_t Chunk::getBlockID(const LocalBlockPos& pos, bool force) const {
+template<bool FORCE>
+uint16_t Chunk::getBlockID(const LocalBlockPos &pos) const {
 	const ChunkSection* cs = getSection(pos.y);
 	if (!cs)
 		return nop_id;
 
 	// check whether this block is really rendered
-	if (checkBlockWorldCrop(pos.x, pos.z, pos.y)!=0)
-		return nop_id;
+	//if (checkBlockWorldCrop(pos.x, pos.z, pos.y)!=0)
+	//	return nop_id;
 
 	// calculate the offset and get the block ID
 	// and don't forget the add data
 	int offset = ((pos.y & 15) * 256) + (pos.z * 16) + pos.x;
 	uint16_t id = cs->block_ids[offset];
-	if (!force && world_crop.hasBlockMask()) {
+	if (!FORCE && world_crop.hasBlockMask()) {
 		const BlockMask* mask = world_crop.getBlockMask();
 		BlockMask::BlockState block_state = mask->getBlockState(id);
 		if (block_state == BlockMask::BlockState::COMPLETELY_HIDDEN)
@@ -321,6 +376,9 @@ uint16_t Chunk::getBlockID(const LocalBlockPos& pos, bool force) const {
 	}
 	return id;
 }
+
+template uint16_t Chunk::getBlockID<false>(const LocalBlockPos&) const;
+template uint16_t Chunk::getBlockID<true>(const LocalBlockPos&) const;
 
 int Chunk::checkBlockWorldCrop(int x, int z, int y) const {
 	// now about the actual world cropping:
@@ -339,28 +397,19 @@ BlockSkyLight Chunk::getBlockSkyLight(const LocalBlockPos &pos) const {
 	const ChunkSection* cs = getSection(pos.y);
 	if (!cs) {
 		 // not existing sections top sections should always have skylight
-		 return { .block_light = 0, .sky_light = static_cast<uint8_t>(has_any_sections ? 15 : mc::OUT_OF_WORLD_LIGHT), };
+		 return default_light_value;
 	}
 
 	// check whether this block is really rendered
-	switch (checkBlockWorldCrop(pos.x, pos.z, pos.y)) {
+	/*switch (checkBlockWorldCrop(pos.x, pos.z, pos.y)) {
 		case 0: break;
-		case 1: return { .block_light = 0, .sky_light = 15, };
-		case 2: return { .block_light = 0, .sky_light = mc::OUT_OF_WORLD_LIGHT, };
-	}
+		case 1: return {0, 15};
+		case 2: return {0, mc::OUT_OF_WORLD_LIGHT};
+	}*/
 
 	// calculate the offset and get the block data
 	unsigned offset = ((pos.y & 15) * 256) + (pos.z * 16) + pos.x;
-	// handle bottom/top nibble
-	uint8_t block_data = cs->block_light[offset >> 1];
-	block_data >>= (offset & 1) == 0 ? 0 : 4;
-	block_data &= 0x0F;
-
-	uint8_t sky_data = cs->sky_light[offset >> 1];
-	sky_data >>= (offset & 1) == 0 ? 0 : 4;
-	sky_data &= 0x0F;
-
-	return { .block_light = block_data, .sky_light = sky_data, };
+	return cs->light[offset];
 }
 
 uint16_t Chunk::getBiomeAt(const LocalBlockPos& pos) const {
