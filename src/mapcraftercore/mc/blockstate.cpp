@@ -22,13 +22,13 @@
 #include "../util.h"
 
 #include <cassert>
+#include <utility> //std::move()
 
 namespace mapcrafter {
 namespace mc {
 
-BlockState::BlockState(std::string name)
-	: name(name) {
-	updateVariantDescription();
+BlockState::BlockState(const std::string& name)
+	: name(name), properties(), variant_description() {
 }
 
 std::string BlockState::getName() const {
@@ -39,23 +39,28 @@ const std::map<std::string, std::string>& BlockState::getProperties() const {
 	return properties;
 }
 
-bool BlockState::hasProperty(std::string key) const {
+bool BlockState::hasProperty(const std::string& key) const {
 	return properties.count(key);
 }
 
-std::string BlockState::getProperty(std::string key, std::string default_value) const {
+const std::string& BlockState::getProperty(const std::string& key, const std::string& default_value) const {
 	if (!properties.count(key)) {
 		return default_value;
 	}
 	return properties.at(key);
 }
 
-void BlockState::setProperty(std::string key, std::string value) {
+void BlockState::setProperty(const std::string& key, const std::string& value) {
 	properties[key] = value;
 	updateVariantDescription();
 }
 
-const std::string BlockState::getVariantDescription() const {
+void BlockState::setProperties(std::map<std::string, std::string> &&properties) {
+	this->properties = std::move(properties);
+	updateVariantDescription();
+}
+
+const std::string& BlockState::getVariantDescription() const {
 	return variant_description;
 }
 
@@ -63,7 +68,7 @@ bool BlockState::operator<(const BlockState& other) const {
 	return variant_description < other.variant_description;
 }
 
-BlockState BlockState::parse(std::string name, std::string variant_description) {
+BlockState BlockState::parse(const std::string& name, const std::string& variant_description) {
 	mc::BlockState block(name);
 	block.properties = util::parseProperties(variant_description);
 	block.updateVariantDescription();
@@ -71,9 +76,16 @@ BlockState BlockState::parse(std::string name, std::string variant_description) 
 }
 
 void BlockState::updateVariantDescription() {
-	variant_description = "";
-	for (auto it = properties.begin(); it != properties.end(); ++it) {
-		variant_description += it->first + "=" + it->second + ",";
+	size_t total_size = 0;
+	for (const auto& property : properties) {
+		total_size += property.first.size() + property.second.size() + 2;
+	}
+
+	variant_description.clear();
+	variant_description.reserve(total_size);
+
+	for (const auto& property : properties) {
+		variant_description.append(property.first).append(1, '=').append(property.second).append(1, ',');
 	}
 }
 
@@ -114,11 +126,11 @@ const BlockState& BlockStateRegistry::getBlockState(uint16_t id) const {
 	return block_states.at(id);
 }
 
-void BlockStateRegistry::addKnownProperty(std::string block, std::string property) {
+void BlockStateRegistry::addKnownProperty(const std::string& block, const std::string& property) {
 	known_properties[block].insert(property);
 }
 
-bool BlockStateRegistry::isKnownProperty(std::string block, std::string property) const {
+bool BlockStateRegistry::isKnownProperty(const std::string& block, const std::string& property) const {
 	auto it = known_properties.find(block);
 	if (it == known_properties.end()) {
 		return false;

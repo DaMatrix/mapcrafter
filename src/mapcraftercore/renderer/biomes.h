@@ -62,14 +62,14 @@ private:
 public:
 	static void initializeBiomes();
 
-	Biome(std::string name = "mapcrafter:unknown", double temperature = 0.5, double rainfall = 0.5,
+	Biome(const std::string& name = "mapcrafter:unknown", double temperature = 0.5, double rainfall = 0.5,
 			RGBAPixel grass_tint = default_grass, RGBAPixel foliage_tint = default_foliage, RGBAPixel water_tint = default_water,
 			bool swamp_mod = false, bool forest_mod = false);
 
-	std::string getName() const;
+	const std::string& getName() const;
 	RGBAPixel getColor(const mc::BlockPos& pos, const ColorMapType& color_type, const ColorMap& color_map) const;
 
-	static uint16_t getBiomeId(std::string name);
+	static uint16_t getBiomeId(const std::string& name);
 	static const Biome& getBiome(uint16_t id);
 };
 

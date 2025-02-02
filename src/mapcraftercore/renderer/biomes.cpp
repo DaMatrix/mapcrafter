@@ -35,7 +35,7 @@ namespace renderer {
 
 const mc::JavaSimplexGenerator Biome::SWAMP_GRASS_NOISE;
 
-Biome::Biome(std::string name, double temperature, double rainfall, RGBAPixel grass_tint, RGBAPixel foliage_tint, RGBAPixel water_tint, bool swamp_mod, bool forest_mod)
+Biome::Biome(const std::string& name, double temperature, double rainfall, RGBAPixel grass_tint, RGBAPixel foliage_tint, RGBAPixel water_tint, bool swamp_mod, bool forest_mod)
 	:name(name), temperature(temperature), rainfall(rainfall),
 		grass_tint(grass_tint), foliage_tint(foliage_tint), water_tint(water_tint)
 	//   ,swamp_mod(swamp_mod), forest_mod(forest_mod)
@@ -45,7 +45,7 @@ Biome::Biome(std::string name, double temperature, double rainfall, RGBAPixel gr
 /**
  * Returns the biome ID.
  */
-std::string Biome::getName() const {
+const std::string& Biome::getName() const {
 	return name;
 }
 
@@ -117,7 +117,7 @@ const Biome& Biome::getBiome(uint16_t id) {
 	return BIOMES[DEFAULT_BIOME_ID];
 }
 
-uint16_t Biome::getBiomeId(std::string name) {
+uint16_t Biome::getBiomeId(const std::string& name) {
 	auto bit = biome_names.find(name);
 	if ( bit != biome_names.end())
 		return biome_names[name];

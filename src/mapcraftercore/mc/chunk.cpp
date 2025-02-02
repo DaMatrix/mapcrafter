@@ -160,7 +160,6 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 
 		// Depalettize block_states palette
 		const nbt::TagList& palettebs = blockstates.findTag<nbt::TagList>("palette");
-		std::vector<mc::BlockState> palette_blockstates(palettebs.payload.size());
 		std::vector<uint16_t> palette_blockstates_idx(palettebs.payload.size());
 		int i = 0;
 		for (auto pbsit = palettebs.payload.begin(); pbsit != palettebs.payload.end(); ++pbsit, ++i) {
@@ -169,16 +168,17 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 
 			mc::BlockState block(name.payload);
 			if (entry.hasTag<nbt::TagCompound>("Properties")) {
+				std::map<std::string, std::string> properties_map;
 				const nbt::TagCompound& properties = entry.findTag<nbt::TagCompound>("Properties");
-				for (auto it3 = properties.payload.begin(); it3 != properties.payload.end(); ++it3) {
-					std::string key = it3->first;
-					std::string value = it3->second->cast<nbt::TagString>().payload;
+				for (const auto& it3 : properties.payload) {
+					const std::string& key = it3.first;
+					const std::string& value = it3.second->cast<nbt::TagString>().payload;
 					if (block_registry.isKnownProperty(block.getName(), key)) {
-						block.setProperty(key, value);
+						properties_map.emplace(key, value);
 					}
 				}
+				block.setProperties(std::move(properties_map));
 			}
-			palette_blockstates[i] = block;
 			palette_blockstates_idx[i] = block_registry.getBlockID(block);
 		}
 
@@ -191,10 +191,10 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 
 			bool ok = true;
 			for (size_t i = 0; i < 16*16*16; i++) {
-				if (section.block_ids[i] >= palette_blockstates.size()) {
+				if (section.block_ids[i] >= palette_blockstates_idx.size()) {
 					int bits_per_entry = databs.payload.size() * 64 / (16*16*16);
 					LOG(ERROR) << "Incorrectly parsed palette ID " << section.block_ids[i]
-						<< " at index " << i << " (max is " << palette_blockstates.size()-1
+						<< " at index " << i << " (max is " << palette_blockstates_idx.size()-1
 						<< " with " << bits_per_entry << " bits per entry)";
 					ok = false;
 					break;

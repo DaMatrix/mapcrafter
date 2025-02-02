@@ -22,6 +22,7 @@
 
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -31,20 +32,21 @@ namespace mc {
 
 class BlockState {
 public:
-	BlockState(std::string name = "");
+	BlockState(const std::string& name = "");
 
 	std::string getName() const;
 
 	const std::map<std::string, std::string>& getProperties() const;
-	bool hasProperty(std::string key) const;
-	std::string getProperty(std::string key, std::string default_value = "") const;
-	void setProperty(std::string key, std::string value);
+	bool hasProperty(const std::string& key) const;
+	const std::string& getProperty(const std::string& key, const std::string& default_value = "") const;
+	void setProperty(const std::string& key, const std::string& value);
+	void setProperties(std::map<std::string, std::string>&& properties);
 
-	const std::string getVariantDescription() const;
+	const std::string& getVariantDescription() const;
 
 	bool operator<(const BlockState& other) const;
 
-	static BlockState parse(std::string name, std::string variant_description);
+	static BlockState parse(const std::string& name, const std::string& variant_description);
 
 private:
 	void updateVariantDescription();
@@ -63,8 +65,8 @@ public:
 	uint16_t getBlockID(const BlockState& block);
 	const BlockState& getBlockState(uint16_t id) const;
 
-	void addKnownProperty(std::string block, std::string property);
-	bool isKnownProperty(std::string block, std::string property) const;
+	void addKnownProperty(const std::string& block, const std::string& property);
+	bool isKnownProperty(const std::string& block, const std::string& property) const;
 
 private:
 	std::mutex mutex;
