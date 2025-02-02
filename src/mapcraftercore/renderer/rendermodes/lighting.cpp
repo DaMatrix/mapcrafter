@@ -205,7 +205,14 @@ void LightingRenderMode::draw(RGBAImage& image, const BlockImage& block_image,
 }
 
 LightingColor LightingRenderMode::calculateLightingColor(const LightingData& light) const {
-	return pow(0.8, 15 - light.getLightLevel(day));
+    static const std::array<LightingColor, 16> LIGHTING_COLOR_LOOKUP = ([]() {
+        std::array<LightingColor, 16> res{};
+        for (int i = 0; i < 16; i++)
+            res[i] = pow(0.8, 15 - i);
+        return res;
+    })();
+
+	return LIGHTING_COLOR_LOOKUP[light.getLightLevel(day)];
 }
 
 LightingData LightingRenderMode::getBlockLight(const mc::BlockPos& pos) {
