@@ -24,7 +24,8 @@
 #include "pos.h"
 #include "worldcrop.h"
 
-#include <stdint.h>
+#include <cstdint>
+#include <array>
 #include <unordered_map>
 
 namespace mapcrafter {
@@ -38,22 +39,22 @@ const int CHUNK_HIGHEST = 20;	// Excluded
 const int Y_CHUNKS_PER_REGION_FILE = 24;	// Number of chunksection in a chunk (to date)
 const int OUT_OF_WORLD_LIGHT = 10;	// Lighting value for shading side of the world
 
+struct BlockSkyLight {
+	uint8_t block_light : 4;
+	uint8_t sky_light : 4;
+};
+
 /**
  * A 16x16x16 section of a chunk.
  */
 struct ChunkSection {
-	int8_t y;
-	uint8_t block_light[16 * 16 * 8];
-	uint8_t sky_light[16 * 16 * 8];
-	uint16_t block_ids[16 * 16 * 16];
-	uint16_t biomes[4 * 4 * 4];
+	std::array<uint8_t, 16 * 16 * 8> block_light;
+	std::array<uint8_t, 16 * 16 * 8> sky_light;
+	std::array<uint16_t, 16 * 16 * 16> block_ids;
+	std::array<uint16_t, 4 * 4 * 4> biomes;
 
-	inline const uint8_t* getArray(int index) const {
-		if (index == 0) {
-			return block_light;
-		} else {
-			return sky_light;
-		}
+	const std::array<uint8_t, 16 * 16 * 8>& getLightArray(LightKind kind) const {
+		return (&block_light)[kind];
 	}
 };
 
@@ -101,14 +102,9 @@ public:
 	uint16_t getBlockID(const LocalBlockPos& pos, bool force = false) const;
 
 	/**
-	 * Returns the block light at a specific position (local coordinates).
-	 */
-	uint8_t getBlockLight(const LocalBlockPos& pos) const;
-
-	/**
 	 * Returns the block sky light at a specific position (local coordinates).
 	 */
-	uint8_t getSkyLight(const LocalBlockPos& pos) const;
+	BlockSkyLight getBlockSkyLight(const LocalBlockPos& pos) const;
 
 	/**
 	 * Returns the block light at a specific position (local coordinates).
@@ -132,14 +128,13 @@ private:
 	// whether the chunk is completely contained (according x- and z-coordinates, not y)
 	bool chunk_completely_contained;
 
-	// the index of the chunk sections in the sections array
-	// or -1 if section does not exist
-	size_t section_offsets[CHUNK_HIGHEST-CHUNK_LOWEST];
-	// the array with the sections, see indexes above
-	std::vector<ChunkSection> sections;
+	//the array of chunk sections, null for sections which do not exist
+	std::array<std::unique_ptr<ChunkSection>, CHUNK_HIGHEST-CHUNK_LOWEST> sections;
 
-	// extra_data (e.g. from attributes read from NBT data, like beds) are stored in this map
-	std::unordered_map<int, uint16_t> extra_data_map;
+	// true if at least one section is non-null
+	bool has_any_sections;
+
+	BlockSkyLight default_light_value;
 
 	/**
 	 * Checks whether a block is in the cropped
@@ -150,14 +145,6 @@ private:
 	 *  2: crop west/est/north/east
 	 */
 	int checkBlockWorldCrop(int x, int z, int y) const;
-
-	/**
-	 * Returns a specific block data (block data value, block light, sky light) at a
-	 * specific position. The parameter array specifies which one:
-	 *   0: block light,
-	 *   1: sky light
-	 */
-	uint8_t getData(const LocalBlockPos& pos, int array, bool force = false) const;
 
 	int positionToKey(int x, int z, int y) const;
 	void insertExtraData(const LocalBlockPos& pos, uint16_t extra_data);
