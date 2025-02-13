@@ -152,9 +152,6 @@ RGBAImage::RGBAImage(int width, int height)
 	: Image<RGBAPixel>(width, height) {
 }
 
-RGBAImage::~RGBAImage() {
-}
-
 void RGBAImage::simpleBlit(const RGBAImage& image, int x, int y) {
 	if (x >= width || y >= height)
 		return;

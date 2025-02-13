@@ -31,6 +31,7 @@
 #include <memory> //std::unique_ptr
 #include <string>
 #include <tuple>
+#include <utility> //std::move(), std::swap()
 #include <vector>
 
 namespace mapcrafter {
@@ -117,11 +118,19 @@ void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length);
 template <typename Pixel>
 class Image {
 public:
-	Image(int width = 0, int height = 0);
+	Image() : width(0), height(0), data(nullptr) {}
+	Image(int width, int height) : width(width), height(height), data(new Pixel[width * height]()) {}
+
     Image(const Image& src) : width(src.width), height(src.height), data(new Pixel[src.width * src.height]) {
         std::copy_n(src.begin(), width * height, begin());
     }
-	~Image();
+
+	Image(Image &&src) noexcept
+			: width(src.width),
+			  height(src.height),
+			  data(std::move(src.data)) {
+		src.width = src.height = 0;
+	}
 
     Image& operator=(const Image& src) {
         if (&src != this) {
@@ -131,6 +140,15 @@ public:
             width = src.width;
             height = src.height;
             std::copy_n(src.begin(), width * height, begin());
+        }
+        return *this;
+    }
+
+    Image& operator=(Image&& src) noexcept {
+        if (&src != this) {
+            std::swap(width, src.width);
+            std::swap(height, src.height);
+			std::swap(data, src.data);
         }
         return *this;
     }
@@ -179,8 +197,8 @@ enum class InterpolationType {
 // TODO better documentation...
 class RGBAImage : public Image<RGBAPixel> {
 public:
-	RGBAImage(int width = 0, int height = 0);
-	~RGBAImage();
+	RGBAImage() : Image<RGBAPixel>() {}
+	RGBAImage(int width, int height);
 
 	/**
 	 * Blits one image to another one. Just copies the pixels over without any processing.
@@ -246,14 +264,6 @@ public:
 	bool writeJPEG(const std::string& filename, int quality,
 			RGBAPixel background = rgba(255, 255, 255, 255)) const;
 };
-
-template <typename Pixel>
-Image<Pixel>::Image(int width, int height)
-	:width(width), height(height), data(new Pixel[width * height]()) {}
-
-template <typename Pixel>
-Image<Pixel>::~Image() {
-}
 
 template <typename Pixel>
 int Image<Pixel>::getWidth() const {

@@ -330,7 +330,7 @@ void Chunk::finishRead() {
 
 void Chunk::clear() {
 	for (auto &section : sections)
-		section.release();
+		section.reset();
 
 	default_light_value.block_light = 0;
 	default_light_value.sky_light = mc::OUT_OF_WORLD_LIGHT;
