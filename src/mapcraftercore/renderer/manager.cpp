@@ -335,9 +335,9 @@ void RenderManager::renderMap(const std::string& map, RenderRotation::Direction 
 
 	RenderContext context;
 	context.output_dir = output_dir;
-	context.background_color = config.getBackgroundColor();
 	context.world_config = config.getWorld(map_config.getWorld());
 	context.map_config = map_config;
+	context.image_format = map_config.getImageFormatInstance(config.getBackgroundColor());
 	context.render_view = render_view.get();
 	context.block_images = block_images.get();
 	context.tile_set = tile_set;
@@ -530,13 +530,15 @@ void RenderManager::initializeMap(const std::string& map) {
 				<< " to " << max_zoom << ".";
 		LOG(INFO) << "I will move some files around...";
 
+		auto image_format = map_config.getImageFormatInstance(config.getBackgroundColor());
+
 		// if zoom level has increased, increase zoom levels of tile sets
 		auto rotations = map_config.getRotations();
 		for (auto rotation_it = rotations.begin(); rotation_it != rotations.end(); ++rotation_it) {
 			fs::path output_dir = config.getOutputPath(map + "/"
 					+ config::ROTATION_NAMES_SHORT[*rotation_it]);
 			for (int i = old_max_zoom; i < max_zoom; i++)
-				increaseMaxZoom(output_dir, map_config.getImageFormatSuffix());
+				increaseMaxZoom(output_dir, *image_format);
 		}
 	}
 
@@ -550,15 +552,9 @@ void RenderManager::initializeMap(const std::string& map) {
  * This method increases the max zoom of a rendered map and makes the necessary changes
  * on the tile tree.
  */
-void RenderManager::increaseMaxZoom(const fs::path& dir,
-		std::string image_format, int jpeg_quality) const {
+void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& image_format) const {
 	// find out tile size by reading old base.png image
-	RGBAImage old_base;
-	if (image_format == "png") {
-		old_base.readPNG((dir / "base.png").string());
-	} else {
-		old_base.readJPEG((dir / "base.jpg").string());
-	}
+	RGBAImage old_base = image_format.readImage((dir / (std::string("base.") + image_format.fileExtension())).string());
 	int w = old_base.getWidth();
 	int h = old_base.getHeight();
 
@@ -569,8 +565,8 @@ void RenderManager::increaseMaxZoom(const fs::path& dir,
 		// then move the old tile trees one zoom level deeper
 		util::moveFile(dir / "1_", dir / "1/4");
 		// also move the images of the directories
-		util::moveFile(dir / (std::string("1.") + image_format),
-				dir / (std::string("1/4.") + image_format));
+		util::moveFile(dir / (std::string("1.") + image_format.fileExtension()),
+				dir / (std::string("1/4.") + image_format.fileExtension()));
 	}
 
 	// do the same for the other directories
@@ -578,79 +574,77 @@ void RenderManager::increaseMaxZoom(const fs::path& dir,
 		util::moveFile(dir / "2", dir / "2_");
 		fs::create_directories(dir / "2");
 		util::moveFile(dir / "2_", dir / "2/3");
-		util::moveFile(dir / (std::string("2.") + image_format),
-				dir / (std::string("2/3.") + image_format));
+		util::moveFile(dir / (std::string("2.") + image_format.fileExtension()),
+				dir / (std::string("2/3.") + image_format.fileExtension()));
 	}
 
 	if (fs::exists(dir / "3")) {
 		util::moveFile(dir / "3", dir / "3_");
 		fs::create_directories(dir / "3");
 		util::moveFile(dir / "3_", dir / "3/2");
-		util::moveFile(dir / (std::string("3.") + image_format),
-				dir / (std::string("3/2.") + image_format));
+		util::moveFile(dir / (std::string("3.") + image_format.fileExtension()),
+				dir / (std::string("3/2.") + image_format.fileExtension()));
 	}
 
 	if (fs::exists(dir / "4")) {
 		util::moveFile(dir / "4", dir / "4_");
 		fs::create_directories(dir / "4");
 		util::moveFile(dir / "4_", dir / "4/1");
-		util::moveFile(dir / (std::string("4.") + image_format),
-				dir / (std::string("4/1.") + image_format));
+		util::moveFile(dir / (std::string("4.") + image_format.fileExtension()),
+				dir / (std::string("4/1.") + image_format.fileExtension()));
 	}
 
 	// now read the images, which belong to the new directories
-	RGBAImage img1, img2, img3, img4;
-	if (image_format == "png") {
-		img1.readPNG((dir / "1/4.png").string());
-		img2.readPNG((dir / "2/3.png").string());
-		img3.readPNG((dir / "3/2.png").string());
-		img4.readPNG((dir / "4/1.png").string());
-	} else {
-		img1.readJPEG((dir / "1/4.jpg").string());
-		img2.readJPEG((dir / "2/3.jpg").string());
-		img3.readJPEG((dir / "3/2.jpg").string());
-		img4.readJPEG((dir / "4/1.jpg").string());
-	}
+	static const std::array<const char*, 4> IMG_PATHS = {
+		"1/4.",
+		"2/3.",
+		"3/2.",
+		"4/1.",
+	};
+	std::array<RGBAImage, 4> imgs{};
+	std::transform(IMG_PATHS.begin(), IMG_PATHS.end(), imgs.begin(),
+		[&dir, &image_format](const char* img_path) {
+			return image_format.readImage((dir / (std::string(img_path) + image_format.fileExtension())).string());
+		});
 
 	// create images for the new directories
-	RGBAImage new1(w, h), new2(w, h), new3(w, h), new4(w, h);
-	RGBAImage old1, old2, old3, old4;
+	std::array<RGBAImage, 4> news{};
+	std::generate(news.begin(), news.end(), [=] { return RGBAImage(w, h); });
+
 	// resize the old images...
-	img1.resize(old1, 0, 0, InterpolationType::HALF);
-	img2.resize(old2, 0, 0, InterpolationType::HALF);
-	img3.resize(old3, 0, 0, InterpolationType::HALF);
-	img4.resize(old4, 0, 0, InterpolationType::HALF);
+	std::array<RGBAImage, 4> olds{};
+	for (size_t i = 0; i < 4; i++)
+		imgs[i].resize(olds[i], 0, 0, InterpolationType::HALF);
 
 	// ...to blit them to the images of the new directories
-	new1.simpleAlphaBlit(old1, w/2, h/2);
-	new2.simpleAlphaBlit(old2, 0, h/2);
-	new3.simpleAlphaBlit(old3, w/2, 0);
-	new4.simpleAlphaBlit(old4, 0, 0);
+	news[0].simpleAlphaBlit(olds[0], w/2, h/2);
+	news[1].simpleAlphaBlit(olds[1], 0, h/2);
+	news[2].simpleAlphaBlit(olds[2], w/2, 0);
+	news[3].simpleAlphaBlit(olds[3], 0, 0);
 
 	// now save the new images in the output directory
-	if (image_format == "png") {
-		new1.writePNG((dir / "1.png").string());
-		new2.writePNG((dir / "2.png").string());
-		new3.writePNG((dir / "3.png").string());
-		new4.writePNG((dir / "4.png").string());
-	} else {
-		new1.writeJPEG((dir / "1.jpg").string(), jpeg_quality);
-		new2.writeJPEG((dir / "2.jpg").string(), jpeg_quality);
-		new3.writeJPEG((dir / "3.jpg").string(), jpeg_quality);
-		new4.writeJPEG((dir / "4.jpg").string(), jpeg_quality);
-	}
+	static const std::array<const char*, 4> NEW_PATHS = {
+		"1.",
+		"2.",
+		"3.",
+		"4.",
+	};
+	for (size_t i = 0; i < 4; i++)
+		image_format.writeImage(news[i], (dir / (std::string(NEW_PATHS[i]) + image_format.fileExtension())).string());
 
 	// don't forget the base.png
-	RGBAImage base(2*h, 2*h);
-	base.simpleAlphaBlit(new1, 0, 0);
-	base.simpleAlphaBlit(new2, w, 0);
-	base.simpleAlphaBlit(new3, 0, h);
-	base.simpleAlphaBlit(new4, w, h);
+	RGBAImage base(2 * h, 2 * h);
+	const std::array<std::pair<int, int>, 4> baseOffsets = {
+		std::pair<int, int>(0, 0),
+		std::pair<int, int>(w, 0),
+		std::pair<int, int>(0, h),
+		std::pair<int, int>(w, h),
+	};
+	for (size_t i = 0; i < 4; i++)
+		base.simpleAlphaBlit(news[i], baseOffsets[i].first, baseOffsets[i].second);
 	base = base.resize(0, 0, InterpolationType::HALF);
-	if (image_format == "png")
-		base.writePNG((dir / "base.png").string());
-	else
-		base.writeJPEG((dir / "base.jpg").string(), jpeg_quality);
+
+	image_format.writeImage(base, (dir / (std::string("base.") + image_format.fileExtension())).string());
 }
 
 }

@@ -19,6 +19,7 @@
 
 #include "../configsections/map.h"
 #include "../iniconfig.h"
+#include "../mapcrafterconfig.h"
 #include "../../util.h"
 
 namespace mapcrafter {
@@ -220,6 +221,21 @@ std::string MapSection::getImageFormatSuffix() const {
 	if (getImageFormat() == ImageFormat::PNG)
 		return "png";
 	return "jpg";
+}
+
+std::unique_ptr<renderer::ImageFormat> MapSection::getImageFormatInstance(const Color& background_color) const {
+	switch (getImageFormat()) {
+		case ImageFormat::PNG:
+			return isPNGIndexed()
+				       ? renderer::ImageFormat::createIndexedPNG()
+				       : renderer::ImageFormat::createPNG();
+		case ImageFormat::JPEG:
+			return renderer::ImageFormat::createJPEG(
+				getJPEGQuality(),
+				renderer::rgba(background_color.red, background_color.green, background_color.blue, 255));
+		default:
+			throw std::invalid_argument("unknown image format");
+	}
 }
 
 bool MapSection::isPNGIndexed() const {

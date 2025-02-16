@@ -41,6 +41,7 @@ class WorldCache;
 namespace renderer {
 
 class BlockImages;
+class ImageFormat;
 class RenderMode;
 class RenderView;
 class RGBAImage;
@@ -50,9 +51,9 @@ class TileSet;
 
 struct RenderContext {
 	fs::path output_dir;
-	config::Color background_color;
 	config::WorldSection world_config;
 	config::MapSection map_config;
+	std::shared_ptr<ImageFormat> image_format;
 
 	RenderView* render_view;
 	BlockImages* block_images;

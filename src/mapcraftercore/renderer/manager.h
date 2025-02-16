@@ -20,6 +20,7 @@
 #ifndef MANAGER_H_
 #define MANAGER_H_
 
+#include "imageformat.h"
 #include "tilerenderer.h"
 #include "tileset.h"
 #include "../config/mapcrafterconfig.h"
@@ -194,8 +195,7 @@ private:
 	/**
 	 * Increases the max zoom level of a map (given as directory, the one with base.png).
 	 */
-	void increaseMaxZoom(const fs::path& dir, std::string image_format,
-			int jpeg_quality = 85) const;
+	void increaseMaxZoom(const fs::path& dir, const ImageFormat& image_format) const;
 
 	config::MapcrafterConfig config;
 	config::WebConfig web_config;

@@ -66,9 +66,7 @@ void TileRenderWorker::setProgressHandler(util::IProgressHandler* progress) {
 }
 
 void TileRenderWorker::saveTile(const TilePath& tile, const RGBAImage& image) {
-	bool png = render_context.map_config.getImageFormat() == config::ImageFormat::PNG;
-	bool png_indexed = render_context.map_config.isPNGIndexed();
-	std::string suffix = std::string(".") + render_context.map_config.getImageFormatSuffix();
+	std::string suffix = std::string(".") + render_context.image_format->fileExtension();
 	std::string filename = tile.toString() + suffix;
 	if (tile.getDepth() == 0)
 		filename = std::string("base") + suffix;
@@ -76,35 +74,29 @@ void TileRenderWorker::saveTile(const TilePath& tile, const RGBAImage& image) {
 	if (!fs::exists(file.parent_path()))
 		fs::create_directories(file.parent_path());
 
-	if ((png && !png_indexed) && !image.writePNG(file.string()))
-		LOG(WARNING) << "Unable to write '" << file.string() << "'.";
-
-	if ((png && png_indexed) && !image.writeIndexedPNG(file.string()))
-		LOG(WARNING) << "Unable to write '" << file.string() << "'.";
-
-	config::Color bg = render_context.background_color;
-	if (!png && !image.writeJPEG(file.string(),
-			render_context.map_config.getJPEGQuality(), rgba(bg.red, bg.green, bg.blue, 255)))
-		LOG(WARNING) << "Unable to write '" << file.string() << "'.";
+	try {
+		render_context.image_format->writeImage(image, file.string());
+	} catch (const std::exception& e) {
+		LOG(WARNING) << "Unable to write '" << file.string() << "'. Cause: " << e.what();
+	}
 }
 
 void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 	// if this is tile is not required or we should skip it, try to load it from file
 	if (!render_context.tile_set->isTileRequired(tile)
 			|| render_work.tiles_skip.count(tile)) {
-		bool png = render_context.map_config.getImageFormat() == config::ImageFormat::PNG;
 		fs::path file = render_context.output_dir
-				/ (tile.toString() + "." + render_context.map_config.getImageFormatSuffix());
-		if ((png && image.readPNG(file.string()))
-				|| (!png && image.readJPEG(file.string()))) {
+		                / (tile.toString() + "." + render_context.image_format->fileExtension());
+		try {
+			image = render_context.image_format->readImage(file.string());
 			if (render_work.tiles_skip.count(tile) && progress != nullptr)
 				progress->setValue(progress->getValue()
 						+ render_context.tile_set->getContainingRenderTiles(tile));
 			return;
+		} catch (const std::exception &e) {
+			LOG(WARNING) << "Unable to read tile '" << tile.toString()
+					<< "', I will just render it again. Cause: " << e.what();
 		}
-
-		LOG(WARNING) << "Unable to read tile '" << tile.toString()
-				<< "', I will just render it again.";
 	}
 
 	if (tile.getDepth() == render_context.tile_set->getDepth()) {

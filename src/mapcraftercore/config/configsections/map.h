@@ -22,10 +22,12 @@
 
 #include "../configsection.h"
 #include "../validation.h"
+#include "../../renderer/imageformat.h"
 #include "../../renderer/rendermode.h"
 #include "../../renderer/renderview.h"
 
 #include <iostream>
+#include <memory> //std::unique_ptr
 #include <set>
 #include <string>
 #include <boost/filesystem.hpp>
@@ -34,6 +36,8 @@ namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace config {
+
+struct Color;
 
 /**
  * Represents all tile sets which are using the same world (as specified in the world
@@ -109,6 +113,7 @@ public:
 
 	ImageFormat getImageFormat() const;
 	std::string getImageFormatSuffix() const;
+	std::unique_ptr<renderer::ImageFormat> getImageFormatInstance(const Color& background_color) const;
 	bool isPNGIndexed() const;
 	int getJPEGQuality() const;
 
