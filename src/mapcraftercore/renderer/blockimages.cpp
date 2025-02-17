@@ -202,7 +202,7 @@ static void blockImageMultiply_scalar(
 	}
 }
 
-#if MAPCRAFTER_SIMD && __x86_64__ && (__AVX2__ || (MAPCRAFTER_AUTO_SIMD && __has_attribute(target)))
+#if HAVE_EXPLICIT_SIMD && __x86_64__ && (__AVX2__ || HAVE_ATTRIBUTE_TARGET_AVX2)
 
 #if !__AVX2__
 #define ATTRIBUTE_TARGET_AVX2 __attribute__((target("avx2")))
@@ -283,8 +283,8 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 }
 #endif
 
-#if !MAPCRAFTER_SIMD || !__x86_64__ || !__AVX2__
-#if MAPCRAFTER_SIMD && __x86_64__ && !__AVX2__ && MAPCRAFTER_AUTO_SIMD && __has_attribute(target)
+#if !HAVE_EXPLICIT_SIMD || !__x86_64__ || !__AVX2__
+#if HAVE_EXPLICIT_SIMD && __x86_64__ && !__AVX2__ && HAVE_ATTRIBUTE_TARGET_AVX2
 __attribute__((target("default")))
 #endif
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.12)
 project(mapcrafter)
 
 option(OPT_DEBUG "Sets debug compiler flags" OFF)
@@ -35,12 +35,10 @@ endif()
 #if(OPT_PROFILE)
 #    add_definitions(-pg)
 #endif()
-if (OPT_AUTO_SIMD)
-    add_definitions(-DMAPCRAFTER_AUTO_SIMD=1)
-endif()
 
 add_definitions(-Wall)
 
+#TODO: investigate link error with default clang++ (14)
 # http://stackoverflow.com/questions/10851247/how-to-activate-c-11-in-cmake
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)

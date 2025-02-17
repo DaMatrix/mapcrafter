@@ -1,14 +1,10 @@
 #ifndef SIMD_H_
 #define SIMD_H_
 
-#include <cstring> // std::memcpy()
+#include "../config.h"
 
-#ifndef __has_attribute
-    #define __has_attribute(x) 0  // Compatibility with non-clang/GCC compilers.
-#endif
-
-#if __has_attribute(vector_size)
-    #define MAPCRAFTER_SIMD 1
+#if HAVE_ATTRIBUTE_VECTOR_SIZE
+    #define HAVE_EXPLICIT_SIMD 1
 
     namespace mapcrafter {
     namespace simd {
@@ -19,16 +15,10 @@
 
     }
     }
-#endif
 
-#if MAPCRAFTER_AUTO_SIMD && __x86_64__ && __has_attribute(target_clones)
-    #define MAPCRAFTER_TARGET_CLONES __attribute__((target_clones("default,sse4.2,avx2,avx512dq")))
-#else
-    #define MAPCRAFTER_TARGET_CLONES
-#endif
-
-#if __x86_64__
-    #include <immintrin.h>
+    #if __x86_64__
+        #include <immintrin.h>
+    #endif
 #endif
 
 #endif //SIMD_H_

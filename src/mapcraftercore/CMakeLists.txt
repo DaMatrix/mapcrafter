@@ -29,6 +29,51 @@ if(HAVE_ENDIAN_H)
     endif()
 endif()
 
+CHECK_CXX_SOURCE_COMPILES("
+    template<class T, int N> using vec __attribute__((vector_size(sizeof(T) * N))) = T;
+    static_assert(sizeof(vec<int, 4>) == 4 * sizeof(int), \"\");
+    int main(){return 0;}" HAVE_ATTRIBUTE_VECTOR_SIZE)
+if(OPT_AUTO_SIMD)
+    CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES)
+    if(HAVE_ATTRIBUTE_TARGET_CLONES)
+        CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default,sse4.2\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES_SSE42 FAIL_REGEX warning)
+        CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default,avx2\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES_AVX2 FAIL_REGEX warning)
+        CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default,arch=x86-64-v2\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V2 FAIL_REGEX warning)
+        CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default,arch=x86-64-v3\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V3 FAIL_REGEX warning)
+        CHECK_CXX_SOURCE_COMPILES("__attribute__((target_clones(\"default,arch=x86-64-v4\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V4 FAIL_REGEX warning)
+
+        if(HAVE_ATTRIBUTE_TARGET_CLONES_SSE42)
+            string(APPEND AUTO_TARGET_CLONES ",sse4.2")
+        endif()
+        if(HAVE_ATTRIBUTE_TARGET_CLONES_AVX2)
+            string(APPEND AUTO_TARGET_CLONES ",avx2")
+        endif()
+        if(HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V2)
+            string(APPEND AUTO_TARGET_CLONES ",arch=x86-64-v2")
+        endif()
+        if(HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V3)
+            string(APPEND AUTO_TARGET_CLONES ",arch=x86-64-v3")
+        endif()
+        if(HAVE_ATTRIBUTE_TARGET_CLONES_X86_64_V4)
+            string(APPEND AUTO_TARGET_CLONES ",arch=x86-64-v4")
+        endif()
+    endif()
+
+    CHECK_CXX_SOURCE_COMPILES("__attribute__((target(\"default\"))) void test(){} int main(){return 0;}" HAVE_ATTRIBUTE_TARGET)
+    if(HAVE_ATTRIBUTE_TARGET)
+        CHECK_CXX_SOURCE_COMPILES("
+            __attribute__((target(\"default\"))) void test(){}
+            __attribute__((target(\"sse4.2\"))) void test(){}
+            int main(){return 0;}
+        " HAVE_ATTRIBUTE_TARGET_SSE42 FAIL_REGEX warning)
+        CHECK_CXX_SOURCE_COMPILES("
+            __attribute__((target(\"default\"))) void test(){}
+            __attribute__((target(\"avx2\"))) void test(){}
+            int main(){return 0;}
+        " HAVE_ATTRIBUTE_TARGET_AVX2 FAIL_REGEX warning)
+    endif()
+endif()
+
 CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/config.h")
 
 add_custom_target(version.cpp
@@ -66,7 +111,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/util")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread/impl")
 
-add_library(mapcraftercore SHARED ${SOURCE})
+add_library(mapcraftercore STATIC ${SOURCE})
 add_dependencies(mapcraftercore version.cpp)
 
 target_link_libraries(mapcraftercore "${Boost_IOSTREAMS_LIBRARY}" "${Boost_SYSTEM_LIBRARY}" "${Boost_FILESYSTEM_LIBRARY}")
