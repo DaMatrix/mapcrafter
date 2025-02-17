@@ -20,6 +20,7 @@
 #include "tilerenderer.h"
 
 #include <algorithm> //std::sort()
+#include <atomic>
 #include <vector>
 
 #include "blockimages.h"
@@ -114,12 +115,22 @@ static void sortTiles(IT begin, IT end, RenderRotation::Direction dir) {
 }
 
 void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
+	static std::atomic<size_t> tile_images_maxsize(64 << 10); //64Ki
+
 	tile.setSize(getTileWidth(), getTileHeight());
 
+	size_t tile_images_capacity_value = tile_images_maxsize;
+
 	boost::container::vector<TileImage> tile_images;
+    tile_images.reserve(tile_images_capacity_value * 2);
 	renderTopBlocks(tile_pos, tile_images);
 
-    size_t count = tile_images.size();
+	size_t count = tile_images.size();
+	if (count > tile_images_capacity_value
+	    && tile_images_maxsize.compare_exchange_strong(tile_images_capacity_value, count)) {
+		LOG(DEBUG) << "raised initial tile_images capacity to " << count;
+	}
+
     std::vector<TileImage*> tile_image_pointers(count);
     for (size_t i = 0; i < count; i++) {
         tile_image_pointers[i] = &tile_images[i];
