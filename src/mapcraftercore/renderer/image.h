@@ -156,6 +156,9 @@ public:
 	int getWidth() const;
 	int getHeight() const;
 
+	size_t getPixelCount() const { return static_cast<size_t>(width) * height; }
+	bool isSameSize(const Image& other) const { return width == other.width && height == other.height; }
+
 	Pixel getPixel(int x, int y) const;
 	void setPixel(int x, int y, Pixel pixel);
 
@@ -172,10 +175,10 @@ public:
 	std::unique_ptr<Pixel[]> data;
 
     Pixel* begin() { return data.get(); }
-    Pixel* end() { return data.get() + (width * height); }
+    Pixel* end() { return data.get() + getPixelCount(); }
 
     const Pixel* begin() const { return data.get(); }
-    const Pixel* end() const { return data.get() + (width * height); }
+    const Pixel* end() const { return data.get() + getPixelCount(); }
 };
 
 const int ROTATE_0 = 0;

@@ -60,6 +60,7 @@ void OverlayRenderMode::draw(RGBAImage& image, const BlockImage& block_image, co
 			color_left = getBlockColor(pos + rotation.getWest(), block_images->getBlockImage(left.id));
 			color_right = getBlockColor(pos + rotation.getSouth(), block_images->getBlockImage(right.id));
 
+			//TODO: it should be possible to do all of these at once without too much work
 			if (rgba_alpha(color_top) != 0)
 				blockImageTintHighContrast(image, block_image.uv_image(0), FACE_UP_INDEX, color_top);
 			if (rgba_alpha(color_left) != 0)

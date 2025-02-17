@@ -28,9 +28,8 @@
 
 #include <boost/filesystem.hpp>
 #include <array>
+#include <memory> //std::unique_ptr
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <cstdint>
 
 namespace fs = boost::filesystem;
@@ -119,14 +118,14 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask,
 
 // TODO maybe this should be named something with multiply too
 AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, uint32_t color);
-void blockImageTintHighContrast(RGBAImage& block, uint32_t color);
-void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int face, uint32_t color);
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, uint32_t color);
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, uint8_t face, uint32_t color);
 void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 		const RGBAImage& top, const RGBAImage& top_uv_mask);
 void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 		uint8_t north, uint8_t south, uint8_t east, uint8_t west, uint8_t bottomleft, uint8_t bottomright);
 bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask);
-std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv);
+AUTO_TARGET_CLONES std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv);
 
 enum class LightingType {
 	NONE,
@@ -220,7 +219,6 @@ public:
 	//virtual int getBlockSize() const {};
 
 	RenderedBlockImages(mc::BlockStateRegistry& block_registry);
-	~RenderedBlockImages();
 
 	void setBlockSideDarkening(float darken_left, float darken_right);
 
@@ -246,7 +244,7 @@ private:
 	int texture_size;
 	int block_width, block_height;
 	// Mapcrafter-local block ID -> BlockImage (image, uv_image, is_transparent, ...)
-	std::vector<BlockImage*> block_images;
+	std::vector<std::unique_ptr<BlockImage>> block_images;
 	BlockImage unknown_block;
 };
 

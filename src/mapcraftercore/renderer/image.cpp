@@ -66,10 +66,14 @@ RGBAPixel rgba_multiply(RGBAPixel value, double r, double g, double b, double a)
 }
 
 int rgba_distance2(RGBAPixel value1, RGBAPixel value2) {
-	return std::pow(rgba_red(value1) - rgba_red(value2), 2)
-		+ std::pow(rgba_green(value1) - rgba_green(value2), 2)
-		+ std::pow(rgba_blue(value1) - rgba_blue(value2), 2)
-		+ std::pow(rgba_alpha(value1) - rgba_alpha(value2), 2);
+	int16_t delta_red = rgba_red(value1) - rgba_red(value2);
+	int16_t delta_green = rgba_green(value1) - rgba_green(value2);
+	int16_t delta_blue = rgba_blue(value1) - rgba_blue(value2);
+	int16_t delta_alpha = rgba_alpha(value1) - rgba_alpha(value2);
+	return delta_red * delta_red +
+	       delta_green * delta_green +
+	       delta_blue * delta_blue +
+	       delta_alpha * delta_alpha;
 }
 
 # ifndef UINT64_C
