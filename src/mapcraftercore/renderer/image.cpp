@@ -35,6 +35,7 @@
 #include <spng.h>
 #endif
 
+#include <boost/endian.hpp>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -541,7 +542,7 @@ void RGBAImage::readPNG(const std::string& filename) {
 	png_set_interlace_handling(png);
 	png_read_update_info(png, info);
 
-	if (mapcrafter::util::isBigEndian()) {
+	if (boost::endian::order::native == boost::endian::order::big) {
 		png_set_bgr(png);
 		png_set_swap_alpha(png);
 	}
@@ -631,7 +632,7 @@ void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 
 	png_set_rows(png, info, rows.get());
 
-	if (mapcrafter::util::isBigEndian())
+	if (boost::endian::order::native == boost::endian::order::big)
 		png_write_png(png, info, PNG_TRANSFORM_BGR | PNG_TRANSFORM_SWAP_ALPHA, NULL);
 	else
 		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);

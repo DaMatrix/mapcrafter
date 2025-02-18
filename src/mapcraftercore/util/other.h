@@ -20,9 +20,11 @@
 #ifndef OTHER_H_
 #define OTHER_H_
 
+#include <cstring> //std::memcpy()
 #include <map>
 #include <string>
 #include <sstream>
+#include <type_traits> //std::is_pod
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
@@ -30,10 +32,19 @@ namespace fs = boost::filesystem;
 namespace mapcrafter {
 namespace util {
 
-bool isBigEndian();
-int16_t bigEndian16(int16_t x);
-int32_t bigEndian32(int32_t x);
-int64_t bigEndian64(int64_t x);
+/**
+ * C++11 compatible alternative to std::bit_cast().
+ */
+template<typename TO, typename FROM>
+inline TO bit_cast(const FROM& from) {
+	static_assert(sizeof(FROM) == sizeof(TO), "Requires matching type sizes");
+	static_assert(std::is_pod<FROM>::value, "Requires POD input");
+	static_assert(std::is_pod<TO>::value, "Requires POD output");
+
+	TO result;
+	std::memcpy(&result, &from, sizeof(TO));
+	return result;
+}
 
 template <typename T>
 std::string str(T value) {

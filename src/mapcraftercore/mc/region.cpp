@@ -24,6 +24,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <sys/param.h>
+#include <boost/endian/buffers.hpp>
+#include <boost/endian/conversion.hpp>
 
 namespace mapcrafter {
 namespace mc {
@@ -77,12 +79,16 @@ bool RegionFile::readHeaders(std::ifstream& file, uint32_t chunk_offsets[1024]) 
 	file.seekg(0, std::ios::beg);
 	file.read(reinterpret_cast<char*>(&header), sizeof(header));
 
+	//convert the headers from big-endian
+	for (uint32_t& header_entry : header)
+		boost::endian::big_to_native_inplace(header_entry);
+
 	for (int z = 0; z < 32; z++) {
 		for (int x = 0; x < 32; x++) {
 			uint32_t tmp = header[(x + z * 32)];
 			if (tmp == 0)
 				continue;
-			uint32_t offset = util::bigEndian32(tmp << 8) * 4096;
+			uint32_t offset = (tmp >> 8) * 4096;
 			if (filesize < offset + 5) {
 				LOG(ERROR) << "Corrupt region '" << filename << "': Invalid offset of chunk "
 						<< x << ":" << z << ".";
@@ -90,7 +96,6 @@ bool RegionFile::readHeaders(std::ifstream& file, uint32_t chunk_offsets[1024]) 
 			}
 
 			uint32_t timestamp = header[1024 + (x + z * 32)];
-			timestamp = util::bigEndian32(timestamp);
 
 			// get the original position of the chunk
 			ChunkPos chunkpos(x + regionpos.x * 32, z + regionpos.z * 32);
@@ -141,23 +146,21 @@ bool RegionFile::read() {
 		int z = (i - x) / 32;
 
 		// get data size and compression type
-		uint32_t size = *(reinterpret_cast<uint32_t*>(&regiondata[offset]));
+		uint32_t size = boost::endian::load_big_u32(reinterpret_cast<unsigned char*>(&regiondata[offset]));
 		if (size == 0) {
 			LOG(ERROR)  << "Corrupt region '" << filename << "': Size of chunk "
 				<< x << ":" << z << " is zero.";
 			return false;
 		}
-		size = util::bigEndian32(size) - 1;
 		uint8_t compression = regiondata[offset + 4];
-		if (filesize < offset + 5 + size) {
+		if (filesize < offset + 4 + size) {
 			LOG(ERROR) << "Corrupt region '" << filename << "': Invalid size of chunk "
 				<< x << ":" << z << ".";
 			return false;
 		}
 
 		chunk_data_compression[i] = compression;
-		chunk_data[i].resize(size);
-		std::copy(&regiondata[offset+5], &regiondata[offset+5+size], chunk_data[i].begin());
+		chunk_data[i].assign(&regiondata[offset + 4 + 1], &regiondata[offset + 4 + size]);
 	}
 
 	return true;
@@ -175,23 +178,21 @@ bool RegionFile::write(std::string filename) const {
 	if (filename.empty())
 		throw std::invalid_argument("You have to specify a filename!");
 
-	uint32_t offsets[1024];
-	for (int i = 0; i < 1024; i++)
-		offsets[i] = 0;
+	uint32_t offsets[1024]{}; //zero-initialize
 
-	std::stringstream out_data, out_header;
+	std::string out_data;
 
 	// write chunk data to a temporary string stream
-	int position = 8192;
+	unsigned position = 8192;
 	for (int i = 0; i < 1024; i++) {
 		if (chunk_data[i].size() == 0)
 			continue;
 		// pad every chunk data with zeros to the next n*4096 bytes
 		if (position % 4096 != 0) {
-			int append = 4096 - position % 4096;
+			unsigned append = 4096 - position % 4096;
 			position += append;
-			for (int j = 0; j < append; j++)
-				out_data.put(0);
+			static const char ZERO_BYTES[4096]{};
+			out_data.append(ZERO_BYTES, append);
 		}
 
 		// calculate the offset, the chunk starts at 4096*offset bytes
@@ -199,33 +200,32 @@ bool RegionFile::write(std::string filename) const {
 
 		// get chunk data, size and compression type
 		const std::vector<uint8_t>& data = chunk_data[i];
-		uint32_t size = data.size();
-		size = util::bigEndian32(size + 1);
+		uint32_t size = boost::endian::native_to_big<uint32_t>(data.size() + 1);
 		uint8_t compression = chunk_data_compression[i];
 
 		// append everything to the data
-		out_data.write(reinterpret_cast<char*>(&size), 4);
-		out_data.write(reinterpret_cast<char*>(&compression), 1);
-		out_data.write(reinterpret_cast<const char*>(&data[0]), data.size());
+		out_data.append(reinterpret_cast<char*>(&size), 4);
+		out_data.append(reinterpret_cast<char*>(&compression), 1);
+		out_data.append(reinterpret_cast<const char*>(&data[0]), data.size());
 		position += data.size() + 5;
 	}
 
 	// create the header with offsets and timestamps
+	boost::endian::big_uint32_buf_t out_header[1024 * 2];
 	for (int i = 0; i < 1024; i++) {
-		uint32_t offset_big_endian = util::bigEndian32(offsets[i]) >> 8;
-		out_header.write(reinterpret_cast<char*>(&offset_big_endian), 4);
+		//TODO: this is wrong, it should also contain the chunk size in sectors
+		out_header[i] = (offsets[i] << 8);
 	}
 
 	for (int i = 0; i < 1024; i++) {
-		uint32_t timestamp_big_endian = util::bigEndian32(chunk_timestamps[i]);
-		out_header.write(reinterpret_cast<char*>(&timestamp_big_endian), 4);
+		out_header[1024 + i] = chunk_timestamps[i];
 	}
 
 	// write complete region file
 	std::ofstream out(filename, std::ios::binary);
 	if (!out)
 		return false;
-	out << out_header.rdbuf() << out_data.rdbuf();
+	out.write(reinterpret_cast<char*>(&out_header), sizeof(out_header)) << out_data;
 	out.close();
 	return !out.fail();
 }

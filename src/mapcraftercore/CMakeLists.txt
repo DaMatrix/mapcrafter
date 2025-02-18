@@ -5,29 +5,9 @@ CHECK_CXX_SOURCE_COMPILES("enum class Test { A=0, B=1, C=3 }; int main() { Test:
 CHECK_CXX_SOURCE_COMPILES("enum class Test; enum class Test { A, B }; int main() { Test::A == Test::B; }" HAVE_ENUM_CLASS_FORWARD_DECLARATION)
 
 INCLUDE(CheckIncludeFiles)
-CHECK_INCLUDE_FILES("endian.h" HAVE_ENDIAN_H)
-CHECK_INCLUDE_FILES("sys/endian.h" HAVE_SYS_ENDIAN_H)
 CHECK_INCLUDE_FILES("sys/ioctl.h" HAVE_SYS_IOCTL_H)
 CHECK_INCLUDE_FILES("unistd.h" HAVE_UNISTD_H)
 CHECK_INCLUDE_FILES("syslog.h" HAVE_SYSLOG_H)
-
-if(HAVE_SYS_ENDIAN_H)
-    set(HAVE_ENDIAN_H ON)
-    set(ENDIAN_H_FREEBSD ON)
-else()
-    set(ENDIAN_H_FREEBSD OFF)
-endif()
-
-if(HAVE_ENDIAN_H)
-    if(HAVE_SYS_ENDIAN_H)
-        CHECK_CXX_SOURCE_COMPILES("#include <sys/endian.h>\n int main() { be16toh(42); be32toh(73); be64toh(21); }" HAVE_ENDIAN_CONVERSION)
-    else()
-        CHECK_CXX_SOURCE_COMPILES("#include <endian.h>\n int main() { be16toh(42); be32toh(73); be64toh(21); }" HAVE_ENDIAN_CONVERSION)
-    endif()
-    if(NOT HAVE_ENDIAN_CONVERSION)
-        set(HAVE_ENDIAN_H OFF)
-    endif()
-endif()
 
 CHECK_CXX_SOURCE_COMPILES("
     template<class T, int N> using vec __attribute__((vector_size(sizeof(T) * N))) = T;

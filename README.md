@@ -59,6 +59,7 @@ For Minecraft 1.17.x (or older) please use previous version of Mapcrafter.
 - Some libraries:
   - `libpng`
   - `libjpeg` (but you may use libjpeg-turbo as drop in replacement)
+  - `libboost-endian`
   - `libboost-iostreams`
   - `libboost-system`
   - `libboost-filesystem` (>= 1.42)

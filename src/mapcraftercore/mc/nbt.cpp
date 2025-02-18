@@ -20,6 +20,7 @@
 #include "nbt.h"
 
 #include <fstream>
+#include <boost/endian/conversion.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
@@ -45,21 +46,21 @@ template <>
 int16_t read<int16_t>(std::istream& stream) {
 	int16_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
-	return util::bigEndian16(value);
+	return boost::endian::big_to_native<int16_t>(value);
 }
 
 template <>
 int32_t read<int32_t>(std::istream& stream) {
 	int32_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
-	return util::bigEndian32(value);
+	return boost::endian::big_to_native<int32_t>(value);
 }
 
 template <>
 int64_t read<int64_t>(std::istream& stream) {
 	int64_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
-	return util::bigEndian64(value);
+	return boost::endian::big_to_native<int64_t>(value);
 }
 
 template <>
@@ -69,7 +70,7 @@ float read<float>(std::istream& stream) {
 		float myfloat;
 	};
 	stream.read(reinterpret_cast<char*>(&tmp), sizeof(int32_t));
-	tmp = util::bigEndian32(tmp);
+	tmp = boost::endian::big_to_native<int32_t>(tmp);
 	return myfloat;
 }
 
@@ -80,7 +81,7 @@ double read<double>(std::istream& stream) {
 		double mydouble;
 	};
 	stream.read(reinterpret_cast<char*>(&tmp), sizeof(int64_t));
-	tmp = util::bigEndian64(tmp);
+	tmp = boost::endian::big_to_native<int64_t>(tmp);
 	return mydouble;
 }
 
@@ -104,42 +105,30 @@ void write<int8_t>(std::ostream& stream, int8_t value) {
 
 template <>
 void write<int16_t>(std::ostream& stream, int16_t value) {
-	int16_t tmp = util::bigEndian16(value);
+	int16_t tmp = boost::endian::native_to_big<int16_t>(value);
 	stream.write(reinterpret_cast<char*>(&tmp), sizeof(value));
 }
 
 template <>
 void write<int32_t>(std::ostream& stream, int32_t value) {
-	int32_t tmp = util::bigEndian32(value);
+	int32_t tmp = boost::endian::native_to_big<int32_t>(value);
 	stream.write(reinterpret_cast<char*>(&tmp), sizeof(value));
 }
 
 template <>
 void write<int64_t>(std::ostream& stream, int64_t value) {
-	int64_t tmp = util::bigEndian64(value);
+	int64_t tmp = boost::endian::native_to_big<int64_t>(value);
 	stream.write(reinterpret_cast<char*>(&tmp), sizeof(value));
 }
 
 template <>
 void write<float>(std::ostream& stream, float value) {
-	union {
-		int32_t tmp;
-		float myfloat;
-	};
-	myfloat = value;
-	tmp = util::bigEndian32(tmp);
-	stream.write(reinterpret_cast<char*>(&tmp), sizeof(int32_t));
+	write<int32_t>(stream, util::bit_cast<int32_t>(value));
 }
 
 template <>
 void write<double>(std::ostream& stream, double value) {
-	union {
-		int64_t tmp;
-		double myfloat;
-	};
-	myfloat = value;
-	tmp = util::bigEndian64(tmp);
-	stream.write(reinterpret_cast<char*>(&tmp), sizeof(int64_t));
+	write<int64_t>(stream, util::bit_cast<int64_t>(value));
 }
 
 template <>
