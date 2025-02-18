@@ -36,22 +36,24 @@ namespace mapcrafter {
 namespace mc {
 namespace nbt {
 
+using istream = std::istream;
+
 class NBTError : public std::runtime_error {
 public:
-	NBTError(const std::string& message = "")
-		: std::runtime_error(message) {}
+	NBTError(const char* message = "") : std::runtime_error(message) {}
+	NBTError(const std::string& message) : std::runtime_error(message) {}
 };
 
 class InvalidTagCast : public NBTError {
 public:
-	InvalidTagCast(const std::string& message = "")
-		: NBTError(message) {}
+	InvalidTagCast(const char* message = "") : NBTError(message) {}
+	InvalidTagCast(const std::string& message) : NBTError(message) {}
 };
 
 class TagNotFound : public NBTError {
 public:
-	TagNotFound(const std::string& message = "")
-		: NBTError(message) {}
+	TagNotFound(const char* message = "") : NBTError(message) {}
+	TagNotFound(const std::string& message) : NBTError(message) {}
 };
 
 // only for reference
@@ -111,7 +113,10 @@ void dumpTag(std::ostream& stream, const std::string& indendation, T tag, P payl
 
 namespace nbtstream {
 template <typename T>
-T read(std::istream& stream);
+T read(istream& stream);
+
+template <typename T>
+void read_array(istream& stream, T* dst, size_t n);
 
 template <typename T>
 void write(std::ostream& stream, T t);
@@ -151,11 +156,12 @@ public:
 
 	const std::string& getName() const;
 	void setName(const std::string& name, bool set_named = true);
+	void setName(std::string&& name, bool set_named = true);
 
-	virtual Tag& read(std::istream& stream);
+	virtual Tag& read(istream& stream) = 0;
 	virtual void write(std::ostream& stream) const;
 	virtual void dump(std::ostream& stream, const std::string& indendation = "") const;
-	virtual Tag* clone() const;
+	virtual Tag* clone() const = 0;
 };
 
 class TagEnd: public Tag {
@@ -169,8 +175,9 @@ template <typename T, TagType tag_type>
 class ScalarTag: public Tag {
 public:
 	ScalarTag(T payload = 0) : Tag(TAG_TYPE), payload(payload) {}
+	ScalarTag(istream& stream) : Tag(TAG_TYPE), payload(nbtstream::read<T>(stream)) {}
 
-	virtual Tag& read(std::istream& stream) {
+	virtual Tag& read(istream& stream) {
 		payload = nbtstream::read<T>(stream);
 		return *this;
 	}
@@ -208,16 +215,12 @@ class TagArray: public Tag {
 public:
 	TagArray() : Tag(TAG_TYPE) {}
 	TagArray(const std::vector<T>& payload) : Tag(TAG_TYPE), payload(payload) {}
+	TagArray(istream& stream) : Tag(TAG_TYPE) { read(stream); }
 
-	virtual Tag& read(std::istream& stream) {
+	virtual Tag& read(istream& stream) {
 		int32_t length = nbtstream::read<int32_t>(stream);
 		payload.resize(length);
-		if (std::is_same<T, int8_t>::value)
-			stream.read(reinterpret_cast<char*>(&payload[0]), length * sizeof(T));
-		else {
-			for (int32_t i = 0; i < length; i++)
-				payload[i] = nbtstream::read<T>(stream);
-		}
+		nbtstream::read_array<T>(stream, payload.data(), length);
 		return *this;
 	}
 
@@ -253,8 +256,9 @@ class TagString: public Tag {
 public:
 	TagString() : Tag(TAG_TYPE) {}
 	TagString(const std::string& payload) : Tag(TAG_TYPE), payload(payload) {}
+	TagString(istream& stream);
 
-	virtual Tag& read(std::istream& stream);
+	virtual Tag& read(istream& stream);
 	virtual void write(std::ostream& stream) const;
 	virtual void dump(std::ostream& stream, const std::string& indendation = "") const;
 	virtual Tag* clone() const;
@@ -266,7 +270,7 @@ public:
 
 // use shared_ptr in gcc <= 4.5.* instead of unique_ptr,
 // because there are problems with smart pointers in containers
-#if __GNUC__ == 4 && __GNUC_MINOR__ <= 5
+#if __GNUC__ == 4 && __GNUC_MINOR__ <= 5 && !__clang__
 # define TagPtrType std::shared_ptr
 #else
 # define TagPtrType std::unique_ptr
@@ -278,11 +282,12 @@ class TagList: public Tag {
 public:
 	TagList(int8_t tag_type = -1);
 	TagList(const TagList& other);
+	TagList(istream& stream) : Tag(TAG_TYPE) { read(stream); }
 	~TagList();
 
 	void operator=(const TagList& other);
 
-	virtual Tag& read(std::istream& stream);
+	virtual Tag& read(istream& stream);
 	virtual void write(std::ostream& stream) const;
 	virtual void dump(std::ostream& stream, const std::string& indendation = "") const;
 	virtual Tag* clone() const;
@@ -297,11 +302,12 @@ class TagCompound: public Tag {
 public:
 	TagCompound(const std::string& name = "");
 	TagCompound(const TagCompound& other);
+	TagCompound(istream& stream) : Tag(TAG_TYPE) { read(stream); }
 	~TagCompound();
 
 	void operator=(const TagCompound& other);
 
-	virtual Tag& read(std::istream& stream);
+	virtual Tag& read(istream& stream);
 	virtual void write(std::ostream& stream) const;
 	virtual void dump(std::ostream& stream, const std::string& indendation = "") const;
 	virtual Tag* clone() const;
@@ -374,6 +380,7 @@ public:
 };
 
 Tag* createTag(int8_t type);
+Tag* createTagAndRead(int8_t type, istream& stream);
 
 }
 }

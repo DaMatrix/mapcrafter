@@ -31,71 +31,76 @@ namespace mc {
 namespace nbt {
 
 namespace nbtstream {
-template <typename T>
-T read(std::istream& stream) {
-}
-
 template <>
-int8_t read<int8_t>(std::istream& stream) {
+int8_t read<int8_t>(istream& stream) {
 	int8_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
 	return value;
 }
 
 template <>
-int16_t read<int16_t>(std::istream& stream) {
+int16_t read<int16_t>(istream& stream) {
 	int16_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
 	return boost::endian::big_to_native<int16_t>(value);
 }
 
 template <>
-int32_t read<int32_t>(std::istream& stream) {
+int32_t read<int32_t>(istream& stream) {
 	int32_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
 	return boost::endian::big_to_native<int32_t>(value);
 }
 
 template <>
-int64_t read<int64_t>(std::istream& stream) {
+int64_t read<int64_t>(istream& stream) {
 	int64_t value;
 	stream.read(reinterpret_cast<char*>(&value), sizeof(value));
 	return boost::endian::big_to_native<int64_t>(value);
 }
 
 template <>
-float read<float>(std::istream& stream) {
-	union {
-		int32_t tmp;
-		float myfloat;
-	};
-	stream.read(reinterpret_cast<char*>(&tmp), sizeof(int32_t));
-	tmp = boost::endian::big_to_native<int32_t>(tmp);
-	return myfloat;
+float read<float>(istream& stream) {
+	return util::bit_cast<float>(read<int32_t>(stream));
 }
 
 template <>
-double read<double>(std::istream& stream) {
-	union {
-		int64_t tmp;
-		double mydouble;
-	};
-	stream.read(reinterpret_cast<char*>(&tmp), sizeof(int64_t));
-	tmp = boost::endian::big_to_native<int64_t>(tmp);
-	return mydouble;
+double read<double>(istream& stream) {
+	return util::bit_cast<double>(read<int64_t>(stream));
 }
 
 template <>
-std::string read<std::string>(std::istream& stream) {
-	std::string value;
+std::string read<std::string>(istream& stream) {
 	int16_t length = read<int16_t>(stream);
+	std::string value;
 	value.resize(length);
 	stream.read(&value[0], length);
 	return value;
 }
 
-template <typename T>
-void write(std::ostream& stream, T value) {
+template<>
+void read_array<int8_t>(istream& stream, int8_t* dst, size_t n) {
+	stream.read(reinterpret_cast<char*>(dst), n * sizeof(int8_t));
+}
+
+template<>
+void read_array<int32_t>(istream& stream, int32_t* dst, size_t n) {
+	//read all the values in one shot
+	stream.read(reinterpret_cast<char*>(dst), n * sizeof(int32_t));
+	
+	//convert the values from big-endian to native
+	for (size_t i = 0; i < n; i++)
+		boost::endian::big_to_native_inplace<int32_t>(dst[i]);
+}
+
+template<>
+void read_array<int64_t>(istream& stream, int64_t* dst, size_t n) {
+	//read all the values in one shot
+	stream.read(reinterpret_cast<char*>(dst), n * sizeof(int64_t));
+	
+	//convert the values from big-endian to native
+	for (size_t i = 0; i < n; i++)
+		boost::endian::big_to_native_inplace<int64_t>(dst[i]);
 }
 
 template <>
@@ -175,8 +180,10 @@ void Tag::setName(const std::string& name, bool set_named) {
 	this->name = name;
 }
 
-Tag& Tag::read(std::istream& stream) {
-	return *this;
+void Tag::setName(std::string&& name, bool set_named) {
+	if (set_named)
+		this->named = true;
+	this->name.assign(std::move(name));
 }
 
 void Tag::write(std::ostream& stream) const {
@@ -189,11 +196,11 @@ void Tag::write(std::ostream& stream) const {
 void Tag::dump(std::ostream& stream, const std::string& indendation) const {
 }
 
-Tag* Tag::clone() const {
-	return new Tag(*this);
+TagString::TagString(istream& stream)
+		: Tag(TAG_TYPE), payload(nbtstream::read<std::string>(stream)) {
 }
 
-Tag& TagString::read(std::istream& stream) {
+Tag& TagString::read(istream& stream) {
 	payload = nbtstream::read<std::string>(stream);
 	return *this;
 }
@@ -224,19 +231,23 @@ TagList::~TagList() {
 }
 
 void TagList::operator=(const TagList& other) {
-	name = other.name;
-	named = other.named;
+	if (this != &other) {
+		name = other.name;
+		named = other.named;
 
-	tag_type = other.tag_type;
+		tag_type = other.tag_type;
 
-	payload.clear();
-	for (auto it = other.payload.begin(); it != other.payload.end(); ++it)
-		payload.push_back(TagPtr((*it)->clone()));
+		payload.clear();
+		payload.reserve(other.payload.size());
+		for (auto& tag : other.payload)
+			payload.emplace_back(tag->clone());
+	}
 }
 
-Tag& TagList::read(std::istream& stream) {
+Tag& TagList::read(istream& stream) {
 	tag_type = nbtstream::read<int8_t>(stream);
 	int32_t length = nbtstream::read<int32_t>(stream);
+	payload.reserve(length);
 	for (int32_t i = 0; i < length; i++) {
 		Tag* tag = createTag(tag_type);
 		if (tag == nullptr)
@@ -245,7 +256,7 @@ Tag& TagList::read(std::istream& stream) {
 		tag->read(stream);
 		tag->setWriteType(false);
 		tag->setNamed(false);
-		payload.push_back(TagPtrType<Tag>(tag));
+		payload.emplace_back(tag);
 	}
 	return *this;
 }
@@ -254,10 +265,10 @@ void TagList::write(std::ostream& stream) const {
 	Tag::write(stream);
 	nbtstream::write<int8_t>(stream, tag_type);
 	nbtstream::write<int32_t>(stream, payload.size());
-	for (auto it = payload.begin(); it != payload.end(); ++it) {
-		(*it)->setWriteType(false);
-		(*it)->setNamed(false);
-		(*it)->write(stream);
+	for (auto& tag : payload) {
+		tag->setWriteType(false);
+		tag->setNamed(false);
+		tag->write(stream);
 	}
 }
 
@@ -267,8 +278,8 @@ void TagList::dump(std::ostream& stream, const std::string& indendation) const {
 		stream << "(\"" << name << "\")";
 	stream << ": " << payload.size() << " entries of type " << static_cast<int>(tag_type) << std::endl;
 	stream << indendation << "{" << std::endl;
-	for (auto it = payload.begin(); it != payload.end(); ++it)
-		(*it)->dump(stream, indendation + "   ");
+	for (auto& tag : payload)
+		tag->dump(stream, indendation + "   ");
 	stream << indendation << "}" << std::endl;
 }
 
@@ -290,38 +301,40 @@ TagCompound::~TagCompound() {
 }
 
 void TagCompound::operator=(const TagCompound& other) {
-	name = other.name;
-	named = other.named;
+	if (this != &other) {
+		name = other.name;
+		named = other.named;
 
-	payload.clear();
-	for (auto it = other.payload.begin(); it != other.payload.end(); ++it)
-		payload[it->first] = TagPtr(it->second->clone());
+		payload.clear();
+		for (auto &tag: other.payload)
+			payload.emplace(tag.first, tag.second->clone());
+	}
 }
 
-Tag& TagCompound::read(std::istream& stream) {
+Tag& TagCompound::read(istream& stream) {
 	while (1) {
 		int8_t tag_type = nbtstream::read<int8_t>(stream);
 		if (tag_type == TagEnd::TAG_TYPE)
 			break;
 		std::string name = nbtstream::read<std::string>(stream);
-		Tag* tag = createTag(tag_type);
+		Tag* tag = createTagAndRead(tag_type, stream);
 		if (tag == nullptr)
 			throw NBTError(std::string("Unknown tag type with id ") + util::str(static_cast<int>(tag_type))
 						   + ". NBT data stream may be corrupted.");
-		tag->read(stream);
 		tag->setName(name);
 		tag->setWriteType(true);
-		payload[name] = TagPtr(tag);
+		if (!payload.emplace(std::move(name), tag).second)
+			throw NBTError("NBT compound tag contains duplicate name!");
 	}
 	return *this;
 }
 
 void TagCompound::write(std::ostream& stream) const {
 	Tag::write(stream);
-	for (auto it = payload.begin(); it != payload.end(); ++it) {
-		it->second->setWriteType(true);
-		it->second->setNamed(true);
-		it->second->write(stream);
+	for (auto& tag : payload) {
+		tag.second->setWriteType(true);
+		tag.second->setNamed(true);
+		tag.second->write(stream);
 	}
 	nbtstream::write<int8_t>(stream, TagEnd::TAG_TYPE);
 }
@@ -332,8 +345,8 @@ void TagCompound::dump(std::ostream& stream, const std::string& indendation) con
 		stream << "(\"" << name << "\")";
 	stream << ": " << payload.size() << " entries" << std::endl;
 	stream << indendation << "{" << std::endl;
-	for (auto it = payload.begin(); it != payload.end(); ++it)
-		it->second->dump(stream, indendation + "   ");
+	for (auto& tag : payload)
+		tag.second->dump(stream, indendation + "   ");
 	stream << indendation << "}" << std::endl;
 }
 
@@ -346,14 +359,10 @@ bool TagCompound::hasTag(const std::string& name) const {
 }
 
 Tag& TagCompound::findTag(const std::string& name) {
-	if (!hasTag(name))
-		throw TagNotFound(std::string("Unable to find tag '") + name + "'");
-	return *payload[name];
+	return *payload.at(name);
 }
 
 const Tag& TagCompound::findTag(const std::string& name) const {
-	if (!hasTag(name))
-		throw TagNotFound(std::string("Unable to find (const) tag '") + name + "'");
 	return *payload.at(name);
 }
 
@@ -475,6 +484,37 @@ Tag* createTag(int8_t type) {
 		return new TagIntArray;
 	case TagLongArray::TAG_TYPE:
 		return new TagLongArray;
+	default:
+		return nullptr;
+	}
+}
+
+Tag* createTagAndRead(int8_t type, istream& stream) {
+	switch (type) {
+	case TagByte::TAG_TYPE:
+		return new TagByte(stream);
+	case TagShort::TAG_TYPE:
+		return new TagShort(stream);
+	case TagInt::TAG_TYPE:
+		return new TagInt(stream);
+	case TagLong::TAG_TYPE:
+		return new TagLong(stream);
+	case TagFloat::TAG_TYPE:
+		return new TagFloat(stream);
+	case TagDouble::TAG_TYPE:
+		return new TagDouble(stream);
+	case TagByteArray::TAG_TYPE:
+		return new TagByteArray(stream);
+	case TagString::TAG_TYPE:
+		return new TagString(stream);
+	case TagList::TAG_TYPE:
+		return new TagList(stream);
+	case TagCompound::TAG_TYPE:
+		return new TagCompound(stream);
+	case TagIntArray::TAG_TYPE:
+		return new TagIntArray(stream);
+	case TagLongArray::TAG_TYPE:
+		return new TagLongArray(stream);
 	default:
 		return nullptr;
 	}
