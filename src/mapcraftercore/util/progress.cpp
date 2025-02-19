@@ -52,12 +52,12 @@ std::string format_eta(int eta) {
 	eta -= minutes * MINUTES;
 	int seconds = eta;
 
-	std::string str_days = util::str(days) + "d";
-	std::string str_hours = util::str(hours) + "h";
-	std::string str_minutes = util::str(minutes) + "m";
+	std::string str_days = std::to_string(days) + "d";
+	std::string str_hours = std::to_string(hours) + "h";
+	std::string str_minutes = std::to_string(minutes) + "m";
 	if (minutes < 10)
 		str_minutes = "0" + str_minutes;
-	std::string str_seconds = util::str(seconds) + "s";
+	std::string str_seconds = std::to_string(seconds) + "s";
 	if (seconds < 10)
 		str_seconds = "0" + str_seconds;
 
@@ -258,17 +258,18 @@ std::string ProgressBar::createProgressStats(double percentage, int value, int m
 	char formatted_percent[20], formatted_speed_average[20];
 	sprintf(&formatted_percent[0], "%.2f%%", percentage);
 	sprintf(&formatted_speed_average[0], "%.2f", speed_average);
-	stats += std::string(formatted_percent) + " ";
-	stats += util::str(value) + "/" + util::str(max) + " ";
-	stats += std::string(formatted_speed_average) + "/s ";
+	stats.append(formatted_percent).append(" ");
+	stats.append(std::to_string(value)).append("/").append(std::to_string(max)).append(" ");
+	stats.append(formatted_speed_average).append("/s ");
 
 	if (eta != -1)
-		stats += "ETA " + format_eta(eta);
+		stats.append("ETA ").append(format_eta(eta));
 
 	// add some padding to these stats
 	// to prevent the progress bar changing the size all the time
 	int padding = 20 - (stats.size() % 20);
-	return stats + std::string(padding, ' ');
+	stats.append(padding, ' ');
+	return stats;
 }
 
 void ProgressBar::finish() {

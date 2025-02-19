@@ -47,14 +47,20 @@ inline TO bit_cast(const FROM& from) {
 }
 
 template <typename T>
-std::string str(T value) {
+inline std::string str(T value) {
 	std::stringstream ss;
 	ss << value;
 	return ss.str();
 }
 
-template <>
-std::string str(bool value);
+inline std::string str(int value) { return std::to_string(value); }
+inline std::string str(unsigned value) { return std::to_string(value); }
+inline std::string str(long value) { return std::to_string(value); }
+inline std::string str(unsigned long value) { return std::to_string(value); }
+inline std::string str(long long value) { return std::to_string(value); }
+inline std::string str(unsigned long long value) { return std::to_string(value); }
+
+inline const char* str(bool value) { return value ? "true" : "false"; }
 
 /**
  * A lazy function to convert different datatypes. It works by printing the value into a

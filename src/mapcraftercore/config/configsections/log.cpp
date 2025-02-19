@@ -48,13 +48,12 @@ namespace mapcrafter {
 namespace config {
 
 std::ostream& operator<<(std::ostream& out, LogSinkType sink_type) {
-	if (sink_type == LogSinkType::OUTPUT)
-		out << "output";
-	else if (sink_type == LogSinkType::FILE)
-		out << "file";
-	else if (sink_type == LogSinkType::SYSLOG)
-		out << "syslog";
-	return out;
+	switch (sink_type) {
+		case LogSinkType::OUTPUT: return out << "output";
+		case LogSinkType::FILE: return out << "file";
+		case LogSinkType::SYSLOG: return out << "syslog";
+		default: return out << "unknown";
+	}
 }
 
 LogSection::LogSection() {

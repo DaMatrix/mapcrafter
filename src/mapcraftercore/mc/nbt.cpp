@@ -251,7 +251,7 @@ Tag& TagList::read(istream& stream) {
 	for (int32_t i = 0; i < length; i++) {
 		Tag* tag = createTag(tag_type);
 		if (tag == nullptr)
-			throw NBTError(std::string("Unknown tag type with id ") + util::str(static_cast<int>(tag_type))
+			throw NBTError(std::string("Unknown tag type with id ") + std::to_string(tag_type)
 						   + ". NBT data stream may be corrupted.");
 		tag->read(stream);
 		tag->setWriteType(false);
@@ -319,7 +319,7 @@ Tag& TagCompound::read(istream& stream) {
 		std::string name = nbtstream::read<std::string>(stream);
 		Tag* tag = createTagAndRead(tag_type, stream);
 		if (tag == nullptr)
-			throw NBTError(std::string("Unknown tag type with id ") + util::str(static_cast<int>(tag_type))
+			throw NBTError(std::string("Unknown tag type with id ") + std::to_string(tag_type)
 						   + ". NBT data stream may be corrupted.");
 		tag->setName(name);
 		tag->setWriteType(true);
@@ -396,12 +396,12 @@ void NBTFile::decompressStream(std::istream& stream, std::stringstream& decompre
 		boost::iostreams::copy(in, decompressed);
 	} catch (boost::iostreams::gzip_error &e) {
 		throw NBTError(
-		        "Error while decompressing gzip data: " + std::string(e.what()) + " ("
-		                + util::str(e.error()) + ")");
+		        std::string("Error while decompressing gzip data: ") + e.what() + " ("
+		                + std::to_string(e.error()) + ")");
 	} catch (boost::iostreams::zlib_error &e) {
 		throw NBTError(
-		        "Error while decompressing zlib data: " + std::string(e.what()) + " ("
-		                + util::str(e.error()) + ")");
+		        std::string("Error while decompressing zlib data: ") + e.what() + " ("
+		                + std::to_string(e.error()) + ")");
 	}
 }
 

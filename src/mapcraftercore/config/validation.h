@@ -271,10 +271,9 @@ bool Field<T>::isLoaded() const {
 template <typename T>
 std::ostream& operator<<(std::ostream& out, Field<T> field) {
 	if (field.isLoaded())
-		out << util::str(field.getValue());
+		return out << util::str(field.getValue());
 	else
-		out << "<not specified>";
-	return out;
+		return out << "<not specified>";
 }
 
 } /* namespace config */

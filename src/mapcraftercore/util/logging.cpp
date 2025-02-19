@@ -199,7 +199,7 @@ std::string FormattedLogSink::formatLogEntry(const LogMessage& message) {
 	formatted = util::replaceAll(formatted, "%(level)", LogLevelHelper::levelToString(message.level));
 	formatted = util::replaceAll(formatted, "%(logger)", message.logger);
 	formatted = util::replaceAll(formatted, "%(file)", message.file);
-	formatted = util::replaceAll(formatted, "%(line)", util::str(message.line));
+	formatted = util::replaceAll(formatted, "%(line)", std::to_string(message.line));
 	formatted = util::replaceAll(formatted, "%(message)", message.message);
 	return formatted;
 }

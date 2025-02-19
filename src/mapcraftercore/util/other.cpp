@@ -26,12 +26,6 @@
 namespace mapcrafter {
 namespace util {
 
-// nicer bool -> string conversion
-template <>
-std::string str<bool>(bool value) {
-	return value ? "true" : "false";
-}
-
 /**
  * Overwrites the string stream solution for string -> string conversion.
  * Why? Converting the string 'This is a test.' would just result in 'This'

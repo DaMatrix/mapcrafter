@@ -44,7 +44,7 @@ struct Marker {
 
 	std::string toJSON() const {
 		std::string json = "{";
-		json += "\"pos\": [" + util::str(pos.x) + "," + util::str(pos.z) + "," + util::str(pos.y) + "], ";
+		json += "\"pos\": [" + std::to_string(pos.x) + "," + std::to_string(pos.z) + "," + std::to_string(pos.y) + "], ";
 		json += "\"title\": \"" + util::escapeJSON(title) + "\", ";
 		json += "\"text\": \"" + util::escapeJSON(text) + "\", ";
 		return json + "}";

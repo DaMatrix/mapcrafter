@@ -236,7 +236,7 @@ public:
 	}
 
 	virtual void dump(std::ostream& stream, const std::string& indendation = "") const {
-		dumpTag(stream, indendation, *this, util::str(payload.size()) + " entries");
+		dumpTag(stream, indendation, *this, std::to_string(payload.size()) + " entries");
 	}
 
 	virtual Tag* clone() const {

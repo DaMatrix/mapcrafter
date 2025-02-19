@@ -133,8 +133,7 @@ void INIConfig::load(std::istream& in) {
 		else if (line[0] == '[') {
 			if (line[line.size() - 1] != ']') {
 				throw INIConfigError("Expecting ']' at end of line "
-						+ util::str(line_number) + ".");
-				return;
+						+ std::to_string(line_number) + ".");
 			}
 
 			std::string type, name;
@@ -149,8 +148,7 @@ void INIConfig::load(std::istream& in) {
 
 			if (name.empty()) {
 				throw INIConfigError("Invalid section name on line "
-						+ util::str(line_number) + ".");
-				return;
+						+ std::to_string(line_number) + ".");
 			}
 
 			section++;
@@ -166,8 +164,7 @@ void INIConfig::load(std::istream& in) {
 				}
 				if (i == line.size() - 1) {
 					throw INIConfigError("No '=' found on line "
-							+ util::str(line_number) + ".");
-					return;
+							+ std::to_string(line_number) + ".");
 				}
 			}
 

@@ -146,11 +146,10 @@ void MarkerSection::postParse(const INIConfigSection& section,
 
 	// check if the old placeholders are used, just search for %placeholder
 	// they are still supported, but show a warning
-	std::vector<std::string> placeholders = {
-		"text", "textp", "prefix", "postfix", "line1", "line2", "line3", "line4", "x", "y", "z"
+	const char* placeholders[] = {
+		"%text", "%textp", "%prefix", "%postfix", "%line1", "%line2", "%line3", "%line4", "%x", "%y", "%z"
 	};
-	for (auto it = placeholders.begin(); it != placeholders.end(); ++it) {
-		std::string placeholder = "%" + *it;
+	for (auto placeholder : placeholders) {
 		if (title_format.getValue().find(placeholder) != std::string::npos
 				|| text_format.getValue().find(placeholder) != std::string::npos) {
 			validation.warning("It seems you are using the old placeholder format "
@@ -165,10 +164,9 @@ void MarkerSection::postParse(const INIConfigSection& section,
  * Replaces the placeholder in the supplied format string. Specifically replaces %(key)
  * (and also the older, but deprecated version %key) with value.
  */
-template <typename T>
-void replacePlaceholder(std::string& str, const std::string& key, T value) {
-	str = util::replaceAll(str, "%" + key, util::str(value));
-	str = util::replaceAll(str, "%(" + key + ")", util::str(value));
+static void replacePlaceholder(std::string& str, const std::string& key, const std::string& value) {
+	str = util::replaceAll(str, "%" + key, value);
+	str = util::replaceAll(str, "%(" + key + ")", value);
 }
 
 std::string MarkerSection::formatSign(std::string format, const mc::SignEntity& sign) const {
@@ -186,9 +184,9 @@ std::string MarkerSection::formatSign(std::string format, const mc::SignEntity& 
 	replacePlaceholder(format, "line2", sign.getLines()[1]);
 	replacePlaceholder(format, "line3", sign.getLines()[2]);
 	replacePlaceholder(format, "line4", sign.getLines()[3]);
-	replacePlaceholder(format, "x", sign.getPos().x);
-	replacePlaceholder(format, "y", sign.getPos().y);
-	replacePlaceholder(format, "z", sign.getPos().z);
+	replacePlaceholder(format, "x", std::to_string(sign.getPos().x));
+	replacePlaceholder(format, "y", std::to_string(sign.getPos().y));
+	replacePlaceholder(format, "z", std::to_string(sign.getPos().z));
 	return format;
 }
 

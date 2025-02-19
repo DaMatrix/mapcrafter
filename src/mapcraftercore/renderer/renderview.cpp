@@ -56,10 +56,10 @@ void RenderView::configureTileRenderer(TileRenderer* tile_renderer,
 
 std::ostream& operator<<(std::ostream& out, RenderViewType render_view) {
 	switch (render_view) {
-	case RenderViewType::ISOMETRIC: return out << "isometric";
-	case RenderViewType::SIDE: return out << "side";
-	case RenderViewType::TOPDOWN: return out << "topdown";
-	default: return out << "unknown";
+		case RenderViewType::ISOMETRIC: return out << "isometric";
+		case RenderViewType::SIDE: return out << "side";
+		case RenderViewType::TOPDOWN: return out << "topdown";
+		default: return out << "unknown";
 	}
 }
 

@@ -175,8 +175,8 @@ TilePath TilePath::byTilePos(const TilePos& tile, int depth) {
 	// check if the tile is in this bounds
 	if (tile.getX() > radius  || tile.getY() > radius
 			|| tile.getX() < -radius || tile.getY() < -radius)
-		throw std::runtime_error("Invalid tile position " + util::str(tile.getX())
-			+ ":" + util::str(tile.getY()) + " on depth " + util::str(depth));
+		throw std::runtime_error("Invalid tile position " + std::to_string(tile.getX())
+			+ ":" + std::to_string(tile.getY()) + " on depth " + std::to_string(depth));
 	// the tactic is here to calculate the bounds where the tile is inside
 	int bounds_left = -radius;
 	int bounds_right = radius;
