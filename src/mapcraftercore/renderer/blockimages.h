@@ -77,8 +77,10 @@ public:
 typedef std::array<float, 4> CornerValues;
 
 struct LightFnc {
-    std::array<uint8_t, 256> lookup_u8;
-    std::array<uint32_t, 256> lookup_u32;
+	constexpr static unsigned NUM_SAMPLES = 256;
+
+    std::array<NormalizedUInt8, NUM_SAMPLES> lookup_u8;
+    std::array<uint32_t, NUM_SAMPLES> lookup_u32;
 
     LightFnc() = default;
 
@@ -89,17 +91,16 @@ struct LightFnc {
                 "generator function must return a uint8_t");
 
 	    // Pre-process the lighting functions
-        for (int x = 0; x < 256; x++) {
-            uint8_t value = generator(float(x) / 255.0f);
-            lookup_u8[x] = value;
+        for (unsigned x = 0; x < NUM_SAMPLES; x++) {
+            uint8_t value = generator(static_cast<float>(x) / static_cast<float>(NUM_SAMPLES - 1));
+            lookup_u8[x] = NormalizedUInt8(value);
             lookup_u32[x] = value;
         }
     }
 };
 
-void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask);
-void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
-		uint8_t except_face, float factor);
+AUTO_TARGET_CLONES void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
+		FaceIndex except_face, float factor);
 
 #if HAVE_EXPLICIT_SIMD && __x86_64__ && !__AVX2__ && HAVE_ATTRIBUTE_TARGET_AVX2
 __attribute__((target("avx2")))
@@ -112,19 +113,18 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
 		const LightFnc& light_fnc);
 
-AUTO_TARGET_CLONES void blockImageMultiply(RGBAImage& block, uint8_t factor);
-void blockImageTint(RGBAImage& block, const RGBAImage& mask,
-		uint32_t color);
+AUTO_TARGET_CLONES void blockImageMultiply(RGBAImage& block, NormalizedUInt8 factor);
+void blockImageTint(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
 
 // TODO maybe this should be named something with multiply too
-AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, uint32_t color);
-AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, uint32_t color);
-AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, uint8_t face, uint32_t color);
+AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color);
 void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 		const RGBAImage& top, const RGBAImage& top_uv_mask);
 void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 		uint8_t north, uint8_t south, uint8_t east, uint8_t west, uint8_t bottomleft, uint8_t bottomright);
-bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask);
+AUTO_TARGET_CLONES bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask);
 AUTO_TARGET_CLONES std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv);
 
 enum class LightingType {

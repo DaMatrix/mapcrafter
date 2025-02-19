@@ -39,9 +39,11 @@ namespace renderer {
 class RGBAImage;
 
 // TODO rename these maybe
-static const uint8_t FACE_LEFT_INDEX  = 0;
-static const uint8_t FACE_RIGHT_INDEX = 1;
-static const uint8_t FACE_UP_INDEX    = 2;
+enum FaceIndex : uint8_t {
+	FACE_LEFT_INDEX  = 0,
+	FACE_RIGHT_INDEX = 1,
+	FACE_UP_INDEX    = 2,
+};
 static const uint8_t FACE_LEFT_COLOR  = ((float)255.0 / 6.0) * 1;
 static const uint8_t FACE_RIGHT_COLOR = ((float)255.0 / 6.0) * 4;
 static const uint8_t FACE_UP_COLOR    = ((float)255.0 / 6.0) * 2;

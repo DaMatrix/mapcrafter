@@ -36,27 +36,6 @@
 namespace mapcrafter {
 namespace renderer {
 
-uint8_t clamp(int c) {
-	if (c < 0)
-		return 0;
-	if (c > 255)
-		return 255;
-	return c;
-}
-
-RGBAPixel rgba_add_clamp(RGBAPixel value, int r, int g, int b, int a) {
-	return rgba(
-		clamp(r + rgba_red(value)),
-		clamp(g + rgba_green(value)),
-		clamp(b + rgba_blue(value)),
-		clamp(a + rgba_alpha(value))
-	);
-}
-
-RGBAPixel rgba_add_clamp(RGBAPixel value, const std::tuple<int, int, int>& values) {
-	return rgba_add_clamp(value, std::get<0>(values), std::get<1>(values), std::get<2>(values));
-}
-
 RGBAPixel rgba_multiply(RGBAPixel value, double r, double g, double b, double a) {
 	uint8_t red = rgba_red(value);
 	uint8_t green = rgba_green(value);

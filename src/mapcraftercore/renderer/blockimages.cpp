@@ -108,49 +108,19 @@ uint32_t ColorMap::getColor(float x, float y) const {
 BlockImages::~BlockImages() {
 }
 
-void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask) {
-	assert(block.isSameSize(uv_mask));
-
-	for (int x = 0; x < block.getWidth(); x++) {
-		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel = block.pixel(x, y);
-			uint32_t uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
-				continue;
-			}
-
-			uint8_t side = rgba_blue(uv_pixel);
-			if (side == FACE_LEFT_INDEX) {
-				pixel = rgba(255, 0, 0);
-			}
-			if (side == FACE_RIGHT_INDEX) {
-				pixel = rgba(0, 255, 0);
-			}
-			if (side == FACE_UP_INDEX) {
-				pixel = rgba(0, 0, 255);;
-			}
-		}
-	}
-}
-
 void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
-		uint8_t except_face, float factor) {
+		FaceIndex except_face, float factor_in) {
 	assert(block.isSameSize(uv_mask));
+	auto factor = NormalizedUInt8::fromFloatingPoint(factor_in);
 
-	for (int x = 0; x < block.getWidth(); x++) {
-		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel = block.pixel(x, y);
-			uint32_t uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
-				continue;
-			}
-
-			uint8_t side = rgba_blue(uv_pixel);
-			if (side != except_face) {
-				pixel = rgba_multiply(pixel, factor, factor, factor);
-			}
-		}
-	}
+	//trivially vectorizable loop
+	std::transform(
+		block.begin(), block.end(), uv_mask.begin(), block.begin(),
+		[except_face, factor](RGBAPixel pixel, RGBAPixel uv_pixel) -> RGBAPixel {
+			return rgba_alpha(uv_pixel) != 0 && rgba_blue(uv_pixel) != except_face
+				       ? rgba_multiply_scalar(pixel, factor)
+				       : pixel;
+		});
 }
 
 namespace {
@@ -193,9 +163,9 @@ static void blockImageMultiply_scalar(
             uint32_t x = mix(ab, cd, v); // divide255((255-v) * ab, v * cd);
 
             // apply light function
-            x = light_fnc.lookup_u8[x];
+            auto light_factor = light_fnc.lookup_u8[x];
 
-            pixel = rgba_multiply_scalar(pixel, x);
+            pixel = rgba_multiply_scalar(pixel, light_factor);
         }
         block[i] = pixel;
 	}
@@ -299,7 +269,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 }
 #endif
 
-void blockImageMultiply(RGBAImage &block, uint8_t factor) {
+void blockImageMultiply(RGBAImage &block, NormalizedUInt8 factor) {
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
@@ -308,7 +278,7 @@ void blockImageMultiply(RGBAImage &block, uint8_t factor) {
 		});
 }
 
-void blockImageTint(RGBAImage &block, const RGBAImage &mask, uint32_t color) {
+void blockImageTint(RGBAImage &block, const RGBAImage &mask, RGBAPixel color) {
 	assert(block.isSameSize(mask));
 
 	std::transform(
@@ -325,7 +295,7 @@ void blockImageTint(RGBAImage &block, const RGBAImage &mask, uint32_t color) {
 		});
 }
 
-void blockImageTint(RGBAImage &block, uint32_t color) {
+void blockImageTint(RGBAImage &block, RGBAPixel color) {
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
@@ -334,13 +304,13 @@ void blockImageTint(RGBAImage &block, uint32_t color) {
 		});
 }
 
-void blockImageTintHighContrast(RGBAImage& block, uint32_t color) {
+static std::array<int, 4> blockImageTintHighContrastAmount(RGBAPixel color) {
 	// get luminance of recolor:
 	// "10*r + 3*g + b" should actually be "3*r + 10*g + b"
 	// it was a typo, but doesn't look bad either
 	int luminance = (10 * rgba_red(color) + 3 * rgba_green(color) + rgba_blue(color)) / 14;
 
-	float alpha_factor = 3; // 3 is similar to alpha=85
+	int alpha_factor = 3; // 3 is similar to alpha=85
 	// something like that would be possible too, but overlays won't look exactly like
 	// overlays with that alpha value, so don't use it for now
 	// alpha_factor = (float) 255.0 / rgba_alpha(color);
@@ -352,32 +322,32 @@ void blockImageTintHighContrast(RGBAImage& block, uint32_t color) {
 	int ng = (rgba_green(color) - luminance) / alpha_factor;
 	int nb = (rgba_blue(color) - luminance) / alpha_factor;
 
+	return { nr, ng, nb, 0 };
+}
+
+void blockImageTintHighContrast(RGBAImage &block, RGBAPixel color) {
+	auto tint = blockImageTintHighContrastAmount(color);
+
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
-		[nr, ng, nb](RGBAPixel pixel) -> RGBAPixel {
+		[tint](RGBAPixel pixel) -> RGBAPixel {
 			return rgba_alpha(pixel)
-				       ? rgba_add_clamp(pixel, nr, ng, nb, 0)
+				       ? rgba_add_clamp(pixel, tint)
 				       : pixel;
 		});
 }
 
-void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, uint8_t face, uint32_t color) {
+void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color) {
 	assert(block.isSameSize(mask));
-
-	// same as above
-	int luminance = (10 * rgba_red(color) + 3 * rgba_green(color) + rgba_blue(color)) / 14;
-	float alpha_factor = 3;
-	int nr = (rgba_red(color) - luminance) / alpha_factor;
-	int ng = (rgba_green(color) - luminance) / alpha_factor;
-	int nb = (rgba_blue(color) - luminance) / alpha_factor;
+	auto tint = blockImageTintHighContrastAmount(color);
 
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), mask.begin(), block.begin(),
-		[face, nr, ng, nb](RGBAPixel pixel, RGBAPixel mask_pixel) -> RGBAPixel {
+		[face, tint](RGBAPixel pixel, RGBAPixel mask_pixel) -> RGBAPixel {
 			return rgba_blue(mask_pixel) == face
-				       ? rgba_add_clamp(pixel, nr, ng, nb, 0)
+				       ? rgba_add_clamp(pixel, tint)
 				       : pixel;
 		});
 }
@@ -462,26 +432,34 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 
 		#undef setalpha
 
-		pixel = rgba_multiply_scalar(pixel, 255 - alpha);
+		pixel = rgba_multiply_scalar(pixel, NormalizedUInt8(255 - alpha));
 	}
 }
 
 bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
 	assert(block.isSameSize(uv_mask));
 
-	//this could be vectorized if we had access to std::any_of with c++17's std::execution::unseq
 	auto block_it = block.begin();
 	auto block_end = block.end();
 	auto uv_it = uv_mask.begin();
-	for (; block_it != block_end; ++block_it, ++uv_it) {
+	/*for (; block_it != block_end; ++block_it, ++uv_it) {
 		auto pixel = *block_it;
 		auto uv_pixel = *uv_it;
 
-		if (rgba_alpha(uv_pixel) == 0 && rgba_alpha(pixel) != 255) {
+		if (rgba_alpha(uv_pixel) != 0 && rgba_alpha(pixel) != 255) {
 			return true;
 		}
 	}
-	return false;
+	return false;*/
+
+	//do this with a loop which can be vectorized
+	int result = 0;
+	for (; block_it != block_end; ++block_it, ++uv_it) {
+		auto pixel = *block_it;
+		auto uv_pixel = *uv_it;
+		result |= rgba_alpha(uv_pixel) != 0 && rgba_alpha(pixel) != 255;
+	}
+	return result != 0;
 }
 
 std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv) {

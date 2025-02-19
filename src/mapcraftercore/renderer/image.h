@@ -21,12 +21,14 @@
 #define IMAGE_H_
 
 #define _USE_MATH_DEFINES
+#include <cassert>
 #include <cmath>
 #include <math.h> // to be sure M_PI is defined
 
 #include <png.h>
 
 #include <algorithm> //std::copy_n()
+#include <array>
 #include <cstdint>
 #include <memory> //std::unique_ptr
 #include <string>
@@ -36,6 +38,50 @@
 
 namespace mapcrafter {
 namespace renderer {
+
+struct NormalizedUInt8 {
+	uint8_t value;
+
+	NormalizedUInt8() = default;
+
+	template<typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type>
+	explicit NormalizedUInt8(T value) : value(value) {
+		assert(value >= 0 && value <= 255);
+	}
+
+	template<typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type>
+	NormalizedUInt8& operator=(T value) {
+		assert(value >= 0 && value <= 255);
+		this->value = value;
+		return *this;
+	}
+
+	bool operator==(const NormalizedUInt8 &rhs) const { return value == rhs.value; }
+	bool operator!=(const NormalizedUInt8 &rhs) const { return value != rhs.value; }
+	bool operator< (const NormalizedUInt8 &rhs) const { return value <  rhs.value; }
+	bool operator<=(const NormalizedUInt8 &rhs) const { return value <= rhs.value; }
+	bool operator> (const NormalizedUInt8 &rhs) const { return value >  rhs.value; }
+	bool operator>=(const NormalizedUInt8 &rhs) const { return value >= rhs.value; }
+
+	operator uint8_t() const { return value; }
+
+	explicit operator float() const { return static_cast<float>(value) / 255.0f; }
+	explicit operator double() const { return static_cast<double>(value) / 255.0; }
+
+	template<typename T>
+	static typename std::enable_if<std::is_floating_point<T>::value, NormalizedUInt8>::type fromFloatingPoint(T f) {
+		assert(f >= 0 && f <= 1);
+		return NormalizedUInt8(static_cast<uint8_t>(f * 255));
+	}
+};
+
+inline NormalizedUInt8 addSaturating(const NormalizedUInt8& lhs, const NormalizedUInt8& rhs) {
+	uint8_t result = lhs.value + rhs.value;
+	if (result < lhs.value) { //the value overflowed!
+		result = 0xFF;
+	}
+	return NormalizedUInt8(result);
+}
 
 typedef uint32_t RGBAPixel;
 
@@ -57,6 +103,14 @@ inline uint8_t rgba_blue(RGBAPixel value) {
 
 inline uint8_t rgba_alpha(RGBAPixel value) {
 	return (value & 0xff000000) >> 24;
+}
+
+inline RGBAPixel rgba(std::array<uint8_t, 4> value) {
+	return rgba(value[0], value[1], value[2], value[3]);
+}
+
+inline std::array<uint8_t, 4> rgba_to_array(RGBAPixel value) {
+	return { rgba_red(value), rgba_green(value), rgba_blue(value), rgba_alpha(value) };
 }
 
 inline RGBAPixel rgba_average(RGBAPixel v1, RGBAPixel v2) {
@@ -98,15 +152,24 @@ inline RGBAPixel rgba_multiply_with_alpha(RGBAPixel v1, RGBAPixel v2) {
 // ...
 // (128+1) * 254 / 256 = 127
 // (128+1) * 255 / 256 = 128
-inline RGBAPixel rgba_multiply_scalar(RGBAPixel value, uint32_t factor) {
+inline RGBAPixel rgba_multiply_scalar(RGBAPixel value, NormalizedUInt8 factor) {
 	uint32_t g = ((((value & 0xff00) + 0x0100) * factor) >> 8) & 0xff00;
 	uint32_t br = ((((value & 0xff00ff) + 0x010001) * factor) >> 8) & 0xff00ff;
 	uint32_t a = value & 0xff000000;
 	return a | g | br;
 }
 
-RGBAPixel rgba_add_clamp(RGBAPixel value, int r, int g, int b, int a = 0);
-RGBAPixel rgba_add_clamp(RGBAPixel value, const std::tuple<int, int, int>& values);
+inline RGBAPixel rgba_add_clamp(RGBAPixel value, std::array<int, 4> add) {
+	auto value_array = rgba_to_array(value);
+	for (int i = 0; i < 4; i++)
+		value_array[i] = std::min(std::max(value_array[i] + add[i], 0), 255);
+	return rgba(value_array);
+}
+
+inline RGBAPixel rgba_add_clamp(RGBAPixel value, int r, int g, int b, int a = 0) {
+	return rgba_add_clamp(value, { r, g, b, a });
+}
+
 RGBAPixel rgba_multiply(RGBAPixel value, double r, double g, double b, double a = 1);
 int rgba_distance2(RGBAPixel value1, RGBAPixel value2);
 
@@ -122,7 +185,7 @@ public:
 	Image(int width, int height) : width(width), height(height), data(new Pixel[width * height]()) {}
 
     Image(const Image& src) : width(src.width), height(src.height), data(new Pixel[src.width * src.height]) {
-        std::copy_n(src.begin(), width * height, begin());
+        std::copy(src.begin(), src.end(), begin());
     }
 
 	Image(Image &&src) noexcept
@@ -139,7 +202,7 @@ public:
             }
             width = src.width;
             height = src.height;
-            std::copy_n(src.begin(), width * height, begin());
+            std::copy(src.begin(), src.end(), begin());
         }
         return *this;
     }
