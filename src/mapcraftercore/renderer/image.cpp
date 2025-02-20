@@ -117,7 +117,7 @@ void blend(RGBAPixel& dest, const RGBAPixel& source) {
 /**
  * http://www.piko3d.com/tutorials/libpng-tutorial-loading-png-files-from-streams
  */
-void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length) {
+static void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length) {
 	//Here we get our IO pointer back from the read struct.
 	//This is the parameter we passed to the png_set_read_fn() function.
 	//Our std::istream pointer.
@@ -126,9 +126,9 @@ void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length) {
 	((std::istream*) a)->read((char*) data, length);
 }
 
-void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length) {
+static void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length) {
 	png_voidp a = png_get_io_ptr(pngPtr);
-	((std::ostream*) a)->write((char*) data, length);
+	((std::string*) a)->append((char*) data, length);
 }
 
 RGBAImage::RGBAImage(int width, int height)
@@ -408,6 +408,17 @@ void RGBAImage::blur(RGBAImage& dest, int radius) const {
 			dest.pixel(x, y) = blurKernel(*this, x, y, radius);
 }
 
+static std::unique_ptr<png_bytep[]> getPNGRowPointers(const RGBAImage& img) {
+	size_t width = img.width;
+	size_t height = img.height;
+	RGBAPixel* p = &img.data[0];
+
+	std::unique_ptr<png_bytep[]> rows(new png_bytep[height]);
+	for (size_t i = 0; i < height; i++, p += width)
+		rows[i] = reinterpret_cast<png_bytep>(p);
+	return rows;
+}
+
 bool RGBAImage::readPNG(const std::string& filename) {
 	std::ifstream file(filename.c_str(), std::ios::binary);
 	if (!file) {
@@ -418,6 +429,9 @@ bool RGBAImage::readPNG(const std::string& filename) {
 	file.read((char*) &png_signature, 8);
 	if (png_sig_cmp(png_signature, 0, 8) != 0)
 		return false;
+
+	//prepare all variables with destructors here so that the destructors won't be skipped by a return to setjmp
+	std::unique_ptr<png_bytep[]> rows;
 
 	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (!png) {
@@ -462,33 +476,35 @@ bool RGBAImage::readPNG(const std::string& filename) {
 		png_set_add_alpha(png, 0xff, PNG_FILLER_AFTER);
 
 	setSize(png_get_image_width(png, info), png_get_image_height(png, info));
+	rows = getPNGRowPointers(*this);
 
 	png_set_interlace_handling(png);
 	png_read_update_info(png, info);
-
-	png_bytep* rows = (png_bytep*) png_malloc(png, height * sizeof(png_bytep));
-	uint32_t* p = &data[0];
-	for (int32_t i = 0; i < height; i++, p += width)
-		rows[i] = (png_bytep) p;
 
 	if (mapcrafter::util::isBigEndian()) {
 		png_set_bgr(png);
 		png_set_swap_alpha(png);
 	}
-	png_read_image(png, rows);
+	png_read_image(png, rows.get());
 	png_read_end(png, NULL);
 
-	png_free(png, rows);
 	png_destroy_read_struct(&png, &info, NULL);
 
 	return true;
 }
 
-bool RGBAImage::writePNG(const std::string& filename) const {
-	std::ofstream file(filename.c_str(), std::ios::binary);
-	if (!file) {
-		return false;
+static void configurePngWrite(png_structp png, const WritePngOptions& options) {
+	if (options.compression_level >= 0) {
+		png_set_compression_level(png, options.compression_level);
 	}
+}
+
+bool RGBAImage::writePNG(const std::string& filename, const WritePngOptions& options) const {
+	std::string file_data;
+	file_data.reserve(getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
+
+	//prepare all variables with destructors here so that the destructors won't be skipped by a return to setjmp
+	std::unique_ptr<png_bytep[]> rows = getPNGRowPointers(*this);
 
 	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (png == NULL)
@@ -505,25 +521,23 @@ bool RGBAImage::writePNG(const std::string& filename) const {
 		return false;
 	}
 
-	png_set_write_fn(png, (png_voidp) &file, pngWriteData, NULL);
+	png_set_write_fn(png, (png_voidp) &file_data, pngWriteData, NULL);
 	png_set_IHDR(png, info, width, height, 8, PNG_COLOR_TYPE_RGB_ALPHA,
 	        PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
-	png_bytep* rows = (png_bytep*) png_malloc(png, height * sizeof(png_bytep));
-	const uint32_t* p = &data[0];
-	for (int32_t i = 0; i < height; i++, p += width)
-		rows[i] = (png_bytep) p;
+	configurePngWrite(png, options);
 
-	png_set_rows(png, info, rows);
+	png_set_rows(png, info, rows.get());
 
 	if (mapcrafter::util::isBigEndian())
 		png_write_png(png, info, PNG_TRANSFORM_BGR | PNG_TRANSFORM_SWAP_ALPHA, NULL);
 	else
 		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);
 
-	file.close();
-	png_free(png, rows);
 	png_destroy_write_struct(&png, &info);
+
+	//this will throw an exception if it fails
+	boost::filesystem::save_string_file(filename, file_data);
 	return true;
 }
 
@@ -552,11 +566,9 @@ void setRowPixel(png_byte* line, int bit_depth, int x, uint8_t index) {
 
 }
 
-bool RGBAImage::writeIndexedPNG(const std::string& filename, int palette_bits, bool dithered) const {
-	std::ofstream file(filename.c_str(), std::ios::binary);
-	if (!file) {
-		return false;
-	}
+bool RGBAImage::writeIndexedPNG(const std::string& filename, const WritePngOptions& options, int palette_bits, bool dithered) const {
+	std::string file_data;
+	file_data.reserve(getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
 
 	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (png == NULL)
@@ -574,9 +586,11 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, int palette_bits, b
 	}
 
 	int palette_size = 1 << palette_bits;
-	png_set_write_fn(png, (png_voidp) &file, pngWriteData, NULL);
+	png_set_write_fn(png, (png_voidp) &file_data, pngWriteData, NULL);
 	png_set_IHDR(png, info, width, height, palette_bits, PNG_COLOR_TYPE_PALETTE,
 			PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+
+	configurePngWrite(png, options);
 
 	//std::cout << "Doing quantization." << std::endl;
 	Octree* octree;
@@ -592,7 +606,7 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, int palette_bits, b
 	}
 
 	png_byte* palette_alpha = (png_byte*) png_malloc(png, palette_size * sizeof(png_byte));
-	if (palette == NULL) {
+	if (palette_alpha == NULL) {
 		png_free(png, palette);
 		png_destroy_write_struct(&png, &info);
 		return false;
@@ -638,7 +652,6 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, int palette_bits, b
 	//else
 		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);
 
-	file.close();
 	for (int y = 0; y < height; y++)
 		png_free(png, rows[y]);
 	png_free(png, rows);
@@ -646,6 +659,9 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, int palette_bits, b
 	png_free(png, palette_alpha);
 	delete octree;
 	png_destroy_write_struct(&png, &info);
+
+	//this will throw an exception if it fails
+	boost::filesystem::save_string_file(filename, file_data);
 	return true;
 }
 

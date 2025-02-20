@@ -158,6 +158,7 @@ void MapSection::dump(std::ostream& out) const {
 	out << "  texture_size = " << texture_size << std::endl;
 	out << "  image_format = " << image_format << std::endl;
 	out << "  png_indexed = " << png_indexed << std::endl;
+	out << "  png_compression_level = " << png_compression_level << std::endl;
 	out << "  jpeg_quality = " << jpeg_quality << std::endl;
 	out << "  lighting_intensity = " << lighting_intensity << std::endl;
 	out << "  lighting_water_intensity = " << lighting_water_intensity << std::endl;
@@ -261,11 +262,15 @@ void MapSection::saveImage(const renderer::RGBAImage &image, const fs::path& fil
 	const Color &background_color) const {
 	bool success;
 	switch (getImageFormat()) {
-		case ImageFormat::PNG:
+		case ImageFormat::PNG: {
+			renderer::WritePngOptions options;
+			options.compression_level = getPNGCompressionLevel();
+
 			success = isPNGIndexed()
-				       ? image.writePNG(filename.string())
-				       : image.writeIndexedPNG(filename.string());
+					   ? image.writeIndexedPNG(filename.string(), options)
+					   : image.writePNG(filename.string(), options);
 			break;
+		}
 		case ImageFormat::JPEG:
 			success = image.writeJPEG(
 				filename.string(),
@@ -381,6 +386,8 @@ bool MapSection::parseField(const std::string key, const std::string value,
 		image_format.load(key, value, validation);
 	} else if (key == "png_indexed") {
 		png_indexed.load(key, value, validation);
+	} else if (key == "png_compression_level") {
+		png_compression_level.load(key, value, validation);
 	} else if (key == "jpeg_quality") {
 		if (jpeg_quality.load(key, value, validation)
 				&& (jpeg_quality.getValue() < 0 || jpeg_quality.getValue() > 100))

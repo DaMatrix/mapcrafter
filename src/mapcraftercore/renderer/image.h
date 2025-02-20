@@ -175,9 +175,6 @@ int rgba_distance2(RGBAPixel value1, RGBAPixel value2);
 
 void blend(RGBAPixel& dest, const RGBAPixel& source);
 
-void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length);
-void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length);
-
 template <typename Pixel>
 class Image {
 public:
@@ -260,6 +257,10 @@ enum class InterpolationType {
 	AUTO
 };
 
+struct WritePngOptions {
+	int compression_level = -1;
+};
+
 // TODO better documentation...
 class RGBAImage : public Image<RGBAPixel> {
 public:
@@ -322,9 +323,10 @@ public:
 	 */
 	void blur(RGBAImage& dest, int radius) const;
 
+	//these functions may throw an std::exception or return false to indicate failure
 	bool readPNG(const std::string& filename);
-	bool writePNG(const std::string& filename) const;
-	bool writeIndexedPNG(const std::string& filename, int palette_bits = 8, bool dithered = true) const;
+	bool writePNG(const std::string& filename, const WritePngOptions& options = {}) const;
+	bool writeIndexedPNG(const std::string& filename, const WritePngOptions& options = {}, int palette_bits = 8, bool dithered = true) const;
 
 	bool readJPEG(const std::string& filename);
 	bool writeJPEG(const std::string& filename, int quality,
