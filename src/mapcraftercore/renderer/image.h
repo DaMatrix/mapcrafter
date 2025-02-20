@@ -25,8 +25,6 @@
 #include <cmath>
 #include <math.h> // to be sure M_PI is defined
 
-#include <png.h>
-
 #include <algorithm> //std::copy_n()
 #include <array>
 #include <cstdint>
@@ -324,8 +322,8 @@ public:
 	void blur(RGBAImage& dest, int radius) const;
 
 	//these functions may throw an std::exception or return false to indicate failure
-	bool readPNG(const std::string& filename);
-	bool writePNG(const std::string& filename, const WritePngOptions& options = {}) const;
+	void readPNG(const std::string& filename);
+	void writePNG(const std::string& filename, const WritePngOptions& options = {}) const;
 	bool writeIndexedPNG(const std::string& filename, const WritePngOptions& options = {}, int palette_bits = 8, bool dithered = true) const;
 
 	bool readJPEG(const std::string& filename);

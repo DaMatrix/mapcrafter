@@ -33,6 +33,8 @@
 
 #cmakedefine OPT_USE_BOOST_THREAD
 
+#cmakedefine01 HAVE_SPNG_LIBRARY
+
 #cmakedefine01 OPT_AUTO_SIMD
 #cmakedefine AUTO_TARGET_CLONES __attribute__((target_clones("default@AUTO_TARGET_CLONES@")))
 

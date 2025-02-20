@@ -29,6 +29,12 @@
 #include "../util.h"
 
 #include <jpeglib.h>
+#include <png.h>
+
+#if HAVE_SPNG_LIBRARY
+#include <spng.h>
+#endif
+
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -408,6 +414,29 @@ void RGBAImage::blur(RGBAImage& dest, int radius) const {
 			dest.pixel(x, y) = blurKernel(*this, x, y, radius);
 }
 
+#if HAVE_SPNG_LIBRARY
+namespace {
+	struct spng_ctx_wrapper {
+		spng_ctx *ctx;
+
+		explicit spng_ctx_wrapper(int flags) : ctx(spng_ctx_new(flags)) {
+		}
+
+		spng_ctx_wrapper(const spng_ctx_wrapper&) = delete;
+
+		~spng_ctx_wrapper() { spng_ctx_free(ctx); }
+		operator spng_ctx *() { return ctx; }
+	};
+
+	//free a unique_ptr using std::free() instead of operator delete
+	struct free_deleter {
+		void operator()(void *ptr) const {
+			std::free(ptr);
+		}
+	};
+}
+#endif
+
 static std::unique_ptr<png_bytep[]> getPNGRowPointers(const RGBAImage& img) {
 	size_t width = img.width;
 	size_t height = img.height;
@@ -419,34 +448,65 @@ static std::unique_ptr<png_bytep[]> getPNGRowPointers(const RGBAImage& img) {
 	return rows;
 }
 
-bool RGBAImage::readPNG(const std::string& filename) {
+void RGBAImage::readPNG(const std::string& filename) {
+	#if HAVE_SPNG_LIBRARY
+		auto fail = [](int err) {
+			throw std::runtime_error(std::string("failed to decode png image: ") + spng_strerror(err));
+		};
+
+		std::string file;
+		boost::filesystem::load_string_file(filename, file);
+
+		//prepare the context
+		spng_ctx_wrapper ctx(0);
+		spng_set_png_buffer(ctx, file.data(), file.size());
+
+		//determine the image size
+		spng_ihdr ihdr;
+		if (int ret = spng_get_ihdr(ctx, &ihdr))
+			return fail(ret);
+
+		size_t buf_size;
+		if (int ret = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &buf_size))
+			return fail(ret);
+
+		//resize the actual image buffer
+		this->setSize(ihdr.width, ihdr.height);
+		if (buf_size != this->getPixelCount() * sizeof(RGBAPixel))
+			return fail(SPNG_EBUFSIZ);
+
+		//actually decode the image
+		if (int ret = spng_decode_image(ctx, &this->data[0], buf_size, SPNG_FMT_RGBA8, 0))
+			return fail(ret);
+		return;
+	#else
+	auto fail = [] { throw std::runtime_error("failed to decode png image"); };
+
 	std::ifstream file(filename.c_str(), std::ios::binary);
-	if (!file) {
-		return false;
-	}
+	if (!file)
+		return fail();
 
 	uint8_t png_signature[8];
 	file.read((char*) &png_signature, 8);
 	if (png_sig_cmp(png_signature, 0, 8) != 0)
-		return false;
+		return fail();
 
 	//prepare all variables with destructors here so that the destructors won't be skipped by a return to setjmp
 	std::unique_ptr<png_bytep[]> rows;
 
 	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!png) {
-		return false;
-	}
+	if (!png)
+		return fail();
 
 	png_infop info = png_create_info_struct(png);
 	if (!info) {
 		png_destroy_read_struct(&png, NULL, NULL);
-		return false;
+		return fail();
 	}
 
 	if (setjmp(png_jmpbuf(png))) {
 		png_destroy_read_struct(&png, &info, NULL);
-		return false;
+		return fail();
 	}
 
 	png_set_read_fn(png, (png_voidp) &file, pngReadData);
@@ -489,8 +549,8 @@ bool RGBAImage::readPNG(const std::string& filename) {
 	png_read_end(png, NULL);
 
 	png_destroy_read_struct(&png, &info, NULL);
-
-	return true;
+	return;
+	#endif
 }
 
 static void configurePngWrite(png_structp png, const WritePngOptions& options) {
@@ -499,7 +559,49 @@ static void configurePngWrite(png_structp png, const WritePngOptions& options) {
 	}
 }
 
-bool RGBAImage::writePNG(const std::string& filename, const WritePngOptions& options) const {
+#if HAVE_SPNG_LIBRARY
+static void configurePngWrite(spng_ctx* ctx, const WritePngOptions& options) {
+	if (options.compression_level >= 0) {
+		spng_set_option(ctx, SPNG_IMG_COMPRESSION_LEVEL, options.compression_level);
+	}
+}
+#endif
+
+void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& options) const {
+	#if HAVE_SPNG_LIBRARY
+		auto fail = [](int err) {
+			throw std::runtime_error(std::string("failed to encode png image: ") + spng_strerror(err));
+		};
+
+		//prepare the context
+		spng_ctx_wrapper ctx(SPNG_CTX_ENCODER);
+		spng_set_option(ctx, SPNG_ENCODE_TO_BUFFER, 1);
+		configurePngWrite(ctx, options);
+
+		spng_ihdr ihdr = {};
+		ihdr.width = width;
+		ihdr.height = height;
+		ihdr.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;
+		ihdr.bit_depth = 8;
+		spng_set_ihdr(ctx, &ihdr);
+
+		//encode the image
+		if (int ret = spng_encode_image(ctx, &this->data[0], this->getPixelCount() * sizeof(RGBAPixel), SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE))
+			return fail(ret);
+
+		//get a pointer to the result buffer
+		size_t png_size;
+		int err;
+		std::unique_ptr<void, free_deleter> png_buf(spng_get_png_buffer(ctx, &png_size, &err));
+		if (png_buf == nullptr)
+			return fail(err);
+
+		//save the result to a file
+		boost::filesystem::save_string_file(filename, std::string(static_cast<char *>(png_buf.get()), png_size));
+		return;
+	#else
+	auto fail = [] { throw std::runtime_error("failed to encode png image"); };
+
 	std::string file_data;
 	file_data.reserve(getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
 
@@ -508,17 +610,17 @@ bool RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 
 	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (png == NULL)
-		return false;
+		return fail();
 
 	png_infop info = png_create_info_struct(png);
 	if (info == NULL) {
 		png_destroy_write_struct(&png, NULL);
-		return false;
+		return fail();
 	}
 
 	if (setjmp(png_jmpbuf(png))) {
 		png_destroy_write_struct(&png, &info);
-		return false;
+		return fail();
 	}
 
 	png_set_write_fn(png, (png_voidp) &file_data, pngWriteData, NULL);
@@ -538,7 +640,8 @@ bool RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 
 	//this will throw an exception if it fails
 	boost::filesystem::save_string_file(filename, file_data);
-	return true;
+	return;
+#endif
 }
 
 namespace {

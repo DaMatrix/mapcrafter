@@ -127,6 +127,10 @@ else()
     target_link_libraries(mapcraftercore ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
+if(HAVE_SPNG_LIBRARY)
+    target_link_libraries(mapcraftercore spng)
+endif()
+
 if(OPT_LINK_BOOST_STATICALLY)
     if(OPT_LINK_DEPS_STATICALLY)
         target_link_libraries(mapcraftercore libz.a)

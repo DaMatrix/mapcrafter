@@ -76,9 +76,10 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 	}
 
 	RGBAImage blocks_atlas;
-
-	if (!blocks_atlas.readPNG(block_file.string())) {
-		LOG(ERROR) << "Unable to load block images: Block image file " << block_file << " not readable!";
+	try {
+		blocks_atlas.readPNG(block_file.string());
+	} catch (const std::exception& e) {
+		LOG(ERROR) << "Unable to load block images: Block image file " << block_file << " not readable! " << e.what();
 		return false;
 	}
 

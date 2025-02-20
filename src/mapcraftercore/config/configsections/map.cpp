@@ -245,8 +245,7 @@ void MapSection::loadImage(renderer::RGBAImage &image, const fs::path& filename)
 	bool success;
 	switch (getImageFormat()) {
 		case ImageFormat::PNG:
-			success = image.readPNG(filename.string());
-			break;
+			return image.readPNG(filename.string());
 		case ImageFormat::JPEG:
 			success = image.readJPEG(filename.string());
 			break;
@@ -266,9 +265,11 @@ void MapSection::saveImage(const renderer::RGBAImage &image, const fs::path& fil
 			renderer::WritePngOptions options;
 			options.compression_level = getPNGCompressionLevel();
 
-			success = isPNGIndexed()
-					   ? image.writeIndexedPNG(filename.string(), options)
-					   : image.writePNG(filename.string(), options);
+			if (isPNGIndexed()) {
+				success = image.writeIndexedPNG(filename.string(), options);
+			} else {
+				return image.writePNG(filename.string(), options);
+			}
 			break;
 		}
 		case ImageFormat::JPEG:
