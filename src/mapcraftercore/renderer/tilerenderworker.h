@@ -53,7 +53,7 @@ struct RenderContext {
 	fs::path output_dir;
 	config::WorldSection world_config;
 	config::MapSection map_config;
-	std::shared_ptr<ImageFormat> image_format;
+	config::Color background_color;
 
 	RenderView* render_view;
 	BlockImages* block_images;

@@ -22,7 +22,6 @@
 
 #include "../configsection.h"
 #include "../validation.h"
-#include "../../renderer/imageformat.h"
 #include "../../renderer/rendermode.h"
 #include "../../renderer/renderview.h"
 
@@ -35,6 +34,10 @@
 namespace fs = boost::filesystem;
 
 namespace mapcrafter {
+namespace renderer {
+class RGBAImage;
+}
+
 namespace config {
 
 struct Color;
@@ -107,15 +110,18 @@ public:
 	std::set<renderer::RenderRotation::Direction> getRotations() const;
 	fs::path getBlockDir() const;
 	int getTextureSize() const;
-	int getTextureBlur() const;
 	double getWaterOpacity() const;
 	int getTileWidth() const;
 
 	ImageFormat getImageFormat() const;
-	std::string getImageFormatSuffix() const;
-	std::unique_ptr<renderer::ImageFormat> getImageFormatInstance(const Color& background_color) const;
+	const char* getImageFormatSuffix() const;
 	bool isPNGIndexed() const;
+	int getPNGCompressionLevel() const;
 	int getJPEGQuality() const;
+
+	//these functions throw an std::exception if image loading fails
+	void loadImage(renderer::RGBAImage& image, const fs::path& filename) const;
+	void saveImage(const renderer::RGBAImage& image, const fs::path& filename, const Color& background_color) const;
 
 	double getLightingIntensity() const;
 	double getLightingWaterIntensity() const;
@@ -152,6 +158,7 @@ private:
 
 	Field<ImageFormat> image_format;
     Field<bool> png_indexed;
+	Field<int> png_compression_level;
 	Field<int> jpeg_quality;
 
 	Field<double> lighting_intensity, lighting_water_intensity;

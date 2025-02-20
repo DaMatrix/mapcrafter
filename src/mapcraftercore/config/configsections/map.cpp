@@ -217,22 +217,12 @@ ImageFormat MapSection::getImageFormat() const {
 	return image_format.getValue();
 }
 
-std::string MapSection::getImageFormatSuffix() const {
-	if (getImageFormat() == ImageFormat::PNG)
-		return "png";
-	return "jpg";
-}
-
-std::unique_ptr<renderer::ImageFormat> MapSection::getImageFormatInstance(const Color& background_color) const {
+const char* MapSection::getImageFormatSuffix() const {
 	switch (getImageFormat()) {
 		case ImageFormat::PNG:
-			return isPNGIndexed()
-				       ? renderer::ImageFormat::createIndexedPNG()
-				       : renderer::ImageFormat::createPNG();
+			return "png";
 		case ImageFormat::JPEG:
-			return renderer::ImageFormat::createJPEG(
-				getJPEGQuality(),
-				renderer::rgba(background_color.red, background_color.green, background_color.blue, 255));
+			return "jpg";
 		default:
 			throw std::invalid_argument("unknown image format");
 	}
@@ -244,6 +234,50 @@ bool MapSection::isPNGIndexed() const {
 
 int MapSection::getJPEGQuality() const {
 	return jpeg_quality.getValue();
+}
+
+int MapSection::getPNGCompressionLevel() const {
+	return png_compression_level.getValue();
+}
+
+void MapSection::loadImage(renderer::RGBAImage &image, const fs::path& filename) const {
+	bool success;
+	switch (getImageFormat()) {
+		case ImageFormat::PNG:
+			success = image.readPNG(filename.string());
+			break;
+		case ImageFormat::JPEG:
+			success = image.readJPEG(filename.string());
+			break;
+		default:
+			throw std::invalid_argument("unknown image format");
+	}
+	if (!success) {
+		throw std::runtime_error("unknown error occurred while loading image: " + filename.string());
+	}
+}
+
+void MapSection::saveImage(const renderer::RGBAImage &image, const fs::path& filename,
+	const Color &background_color) const {
+	bool success;
+	switch (getImageFormat()) {
+		case ImageFormat::PNG:
+			success = isPNGIndexed()
+				       ? image.writePNG(filename.string())
+				       : image.writeIndexedPNG(filename.string());
+			break;
+		case ImageFormat::JPEG:
+			success = image.writeJPEG(
+				filename.string(),
+				getJPEGQuality(),
+				renderer::rgba(background_color.red, background_color.green, background_color.blue, 255));
+			break;
+		default:
+			throw std::invalid_argument("unknown image format");
+	}
+	if (!success) {
+		throw std::runtime_error("unknown error occurred while writing image: " + filename.string());
+	}
 }
 
 double MapSection::getLightingIntensity() const {
@@ -295,6 +329,7 @@ void MapSection::preParse(const INIConfigSection& section,
 
 	image_format.setDefault(ImageFormat::PNG);
 	png_indexed.setDefault(false);
+	png_compression_level.setDefault(-1);
 	jpeg_quality.setDefault(85);
 
 	lighting_intensity.setDefault(1.0);

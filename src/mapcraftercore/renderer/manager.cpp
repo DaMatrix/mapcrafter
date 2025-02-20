@@ -337,7 +337,7 @@ void RenderManager::renderMap(const std::string& map, RenderRotation::Direction 
 	context.output_dir = output_dir;
 	context.world_config = config.getWorld(map_config.getWorld());
 	context.map_config = map_config;
-	context.image_format = map_config.getImageFormatInstance(config.getBackgroundColor());
+	context.background_color = config.getBackgroundColor();
 	context.render_view = render_view.get();
 	context.block_images = block_images.get();
 	context.tile_set = tile_set;
@@ -530,7 +530,7 @@ void RenderManager::initializeMap(const std::string& map) {
 				<< " to " << max_zoom << ".";
 		LOG(INFO) << "I will move some files around...";
 
-		auto image_format = map_config.getImageFormatInstance(config.getBackgroundColor());
+		auto background_color = config.getBackgroundColor();
 
 		// if zoom level has increased, increase zoom levels of tile sets
 		auto rotations = map_config.getRotations();
@@ -538,7 +538,7 @@ void RenderManager::initializeMap(const std::string& map) {
 			fs::path output_dir = config.getOutputPath(map + "/"
 					+ config::ROTATION_NAMES_SHORT[*rotation_it]);
 			for (int i = old_max_zoom; i < max_zoom; i++)
-				increaseMaxZoom(output_dir, *image_format);
+				increaseMaxZoom(output_dir, map_config, background_color);
 		}
 	}
 
@@ -552,9 +552,10 @@ void RenderManager::initializeMap(const std::string& map) {
  * This method increases the max zoom of a rendered map and makes the necessary changes
  * on the tile tree.
  */
-void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& image_format) const {
+void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSection& map_config, const config::Color& background_color) const {
 	// find out tile size by reading old base.png image
-	RGBAImage old_base = image_format.readImage((dir / (std::string("base.") + image_format.fileExtension())).string());
+	RGBAImage old_base;
+	map_config.loadImage(old_base, dir / (std::string("base.") + map_config.getImageFormatSuffix()));
 	int w = old_base.getWidth();
 	int h = old_base.getHeight();
 
@@ -565,8 +566,8 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& imag
 		// then move the old tile trees one zoom level deeper
 		util::moveFile(dir / "1_", dir / "1/4");
 		// also move the images of the directories
-		util::moveFile(dir / (std::string("1.") + image_format.fileExtension()),
-				dir / (std::string("1/4.") + image_format.fileExtension()));
+		util::moveFile(dir / (std::string("1.") + map_config.getImageFormatSuffix()),
+				dir / (std::string("1/4.") + map_config.getImageFormatSuffix()));
 	}
 
 	// do the same for the other directories
@@ -574,38 +575,41 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& imag
 		util::moveFile(dir / "2", dir / "2_");
 		fs::create_directories(dir / "2");
 		util::moveFile(dir / "2_", dir / "2/3");
-		util::moveFile(dir / (std::string("2.") + image_format.fileExtension()),
-				dir / (std::string("2/3.") + image_format.fileExtension()));
+		util::moveFile(dir / (std::string("2.") + map_config.getImageFormatSuffix()),
+				dir / (std::string("2/3.") + map_config.getImageFormatSuffix()));
 	}
 
 	if (fs::exists(dir / "3")) {
 		util::moveFile(dir / "3", dir / "3_");
 		fs::create_directories(dir / "3");
 		util::moveFile(dir / "3_", dir / "3/2");
-		util::moveFile(dir / (std::string("3.") + image_format.fileExtension()),
-				dir / (std::string("3/2.") + image_format.fileExtension()));
+		util::moveFile(dir / (std::string("3.") + map_config.getImageFormatSuffix()),
+				dir / (std::string("3/2.") + map_config.getImageFormatSuffix()));
 	}
 
 	if (fs::exists(dir / "4")) {
 		util::moveFile(dir / "4", dir / "4_");
 		fs::create_directories(dir / "4");
 		util::moveFile(dir / "4_", dir / "4/1");
-		util::moveFile(dir / (std::string("4.") + image_format.fileExtension()),
-				dir / (std::string("4/1.") + image_format.fileExtension()));
+		util::moveFile(dir / (std::string("4.") + map_config.getImageFormatSuffix()),
+				dir / (std::string("4/1.") + map_config.getImageFormatSuffix()));
 	}
 
 	// now read the images, which belong to the new directories
-	static const std::array<const char*, 4> IMG_PATHS = {
+	std::array<const char*, 4> IMG_PATHS = {
 		"1/4.",
 		"2/3.",
 		"3/2.",
 		"4/1.",
 	};
 	std::array<RGBAImage, 4> imgs{};
-	std::transform(IMG_PATHS.begin(), IMG_PATHS.end(), imgs.begin(),
-		[&dir, &image_format](const char* img_path) {
-			return image_format.readImage((dir / (std::string(img_path) + image_format.fileExtension())).string());
-		});
+	for (size_t i = 0; i < 4; i++) {
+		try {
+			map_config.loadImage(imgs[i], dir / (std::string(IMG_PATHS[i]) + map_config.getImageFormatSuffix()));
+		} catch (const std::exception&) {
+			//ignore
+		}
+	}
 
 	// create images for the new directories
 	std::array<RGBAImage, 4> news{};
@@ -623,14 +627,14 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& imag
 	news[3].simpleAlphaBlit(olds[3], 0, 0);
 
 	// now save the new images in the output directory
-	static const std::array<const char*, 4> NEW_PATHS = {
+	std::array<const char*, 4> NEW_PATHS = {
 		"1.",
 		"2.",
 		"3.",
 		"4.",
 	};
 	for (size_t i = 0; i < 4; i++)
-		image_format.writeImage(news[i], (dir / (std::string(NEW_PATHS[i]) + image_format.fileExtension())).string());
+		map_config.saveImage(news[i], dir / (std::string(NEW_PATHS[i]) + map_config.getImageFormatSuffix()), background_color);
 
 	// don't forget the base.png
 	RGBAImage base(2 * h, 2 * h);
@@ -644,7 +648,7 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const ImageFormat& imag
 		base.simpleAlphaBlit(news[i], baseOffsets[i].first, baseOffsets[i].second);
 	base = base.resize(0, 0, InterpolationType::HALF);
 
-	image_format.writeImage(base, (dir / (std::string("base.") + image_format.fileExtension())).string());
+	map_config.saveImage(base, dir / (std::string("base.") + map_config.getImageFormatSuffix()), background_color);
 }
 
 }

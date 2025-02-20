@@ -20,6 +20,7 @@
 #include "tilerenderer.h"
 
 #include <algorithm> //std::sort()
+#include <atomic>
 #include <vector>
 
 #include "blockimages.h"
@@ -113,19 +114,6 @@ static void sortTiles(IT begin, IT end, RenderRotation::Direction dir) {
 	}
 }
 
-namespace {
-    class max_statistic {
-        const char* name;
-        size_t i = 0;
-
-    public:
-        max_statistic(const char* name) : name(name) {}
-
-        void update(size_t i) { this->i = std::max(i, this->i); }
-        ~max_statistic() { LOG(INFO) << "[" << name << "]: " << i; }
-    };
-}
-
 void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 	static std::atomic<size_t> tile_images_maxsize(64 << 10); //64Ki
 
@@ -154,9 +142,6 @@ void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 	for (auto it : tile_image_pointers) {
 		tile.alphaBlit(it->image, it->x, it->y);
 	}
-
-    static thread_local max_statistic maxCount("maximum tile_images size");
-    maxCount.update(tile_images.size());
 }
 
 int TileRenderer::getTileWidth() const {

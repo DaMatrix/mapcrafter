@@ -66,18 +66,18 @@ void TileRenderWorker::setProgressHandler(util::IProgressHandler* progress) {
 }
 
 void TileRenderWorker::saveTile(const TilePath& tile, const RGBAImage& image) {
-	std::string suffix = std::string(".") + render_context.image_format->fileExtension();
-	std::string filename = tile.toString() + suffix;
+	std::string filename = tile.toString() + '.' + render_context.map_config.getImageFormatSuffix();
 	if (tile.getDepth() == 0)
-		filename = std::string("base") + suffix;
+		filename = std::string("base.") + render_context.map_config.getImageFormatSuffix();
+
 	fs::path file = render_context.output_dir / filename;
 	if (!fs::exists(file.parent_path()))
 		fs::create_directories(file.parent_path());
 
 	try {
-		render_context.image_format->writeImage(image, file.string());
+		render_context.map_config.saveImage(image, file, render_context.background_color);
 	} catch (const std::exception& e) {
-		LOG(WARNING) << "Unable to write '" << file.string() << "'. Cause: " << e.what();
+		LOG(WARNING) << "Unable to write '" << file.string() << '.' << render_context.map_config.getImageFormatSuffix() << "'. Cause: " << e.what();
 	}
 }
 
@@ -86,15 +86,15 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 	if (!render_context.tile_set->isTileRequired(tile)
 			|| render_work.tiles_skip.count(tile)) {
 		fs::path file = render_context.output_dir
-		                / (tile.toString() + "." + render_context.image_format->fileExtension());
+		                / (tile.toString() + '.' + render_context.map_config.getImageFormatSuffix());
 		try {
-			image = render_context.image_format->readImage(file.string());
+			render_context.map_config.loadImage(image, file);
 			if (render_work.tiles_skip.count(tile) && progress != nullptr)
 				progress->setValue(progress->getValue()
 						+ render_context.tile_set->getContainingRenderTiles(tile));
 			return;
 		} catch (const std::exception &e) {
-			LOG(WARNING) << "Unable to read tile '" << tile.toString()
+			LOG(WARNING) << "Unable to read tile '" << file.string()
 					<< "', I will just render it again. Cause: " << e.what();
 		}
 	}
