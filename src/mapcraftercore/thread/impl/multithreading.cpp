@@ -138,10 +138,10 @@ void MultiThreadingDispatcher::dispatch(const renderer::RenderContext& context,
 		threads.push_back(thread_ns::thread(ThreadWorker(manager, thread_context)));
 	}
 
-	progress->setMax(context.tile_set->getRequiredRenderTilesCount());
+	progress->begin(context.tile_set->getRequiredRenderTilesCount());
 	renderer::RenderWorkResult result;
 	while (manager.getResult(result)) {
-		progress->setValue(progress->getValue() + result.tiles_rendered);
+		progress->incrementValue(result.tiles_rendered);
 		for (auto tile_it = result.render_work.tiles.begin();
 				tile_it != result.render_work.tiles.end(); ++tile_it) {
 			rendered_tiles.insert(*tile_it);

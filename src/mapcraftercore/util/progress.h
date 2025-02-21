@@ -20,96 +20,73 @@
 #ifndef PROGRESS_H_
 #define PROGRESS_H_
 
-#include <string>
+#include <cstddef> //size_t
+#include <ctime> //std::time_t
+#include <mutex>
 #include <vector>
 
 namespace mapcrafter {
 namespace util {
-
-std::string format_eta(int eta);
 
 /**
  * A basic interface for a progress handler.
  */
 class IProgressHandler {
 public:
-	virtual ~IProgressHandler() {};
+	using progress_t = size_t;
 
-	virtual int getMax() const = 0;
-	virtual void setMax(int max) = 0;
+	virtual ~IProgressHandler();
 
-	virtual int getValue() const = 0;
-	virtual void setValue(int value) = 0;
+	virtual void begin(progress_t max) = 0;
+	virtual void incrementValue(progress_t increment = 1) = 0;
 };
 
 class MultiplexingProgressHandler : public IProgressHandler {
+	std::vector<IProgressHandler*> handlers;
+
 public:
 	MultiplexingProgressHandler();
-	virtual ~MultiplexingProgressHandler();
 
 	void addHandler(IProgressHandler* handler);
 
-	virtual int getMax() const;
-	virtual void setMax(int max);
-
-	virtual int getValue() const;
-	virtual void setValue(int value);
-
-protected:
-	int max, value;
-
-	std::vector<IProgressHandler*> handlers;
+	void begin(progress_t max) override;
+	void incrementValue(progress_t increment) override;
 };
 
-/**
- * A dummy progress handler. Implements progress handler interface and allows setting
- * and getting the progress values.
- */
-class DummyProgressHandler : public IProgressHandler {
-public:
-	DummyProgressHandler();
-	virtual ~DummyProgressHandler();
-
-	virtual int getMax() const;
-	virtual void setMax(int max);
-
-	virtual int getValue() const;
-	virtual void setValue(int value);
-
-protected:
-	// the maximum and current value of the progress
-	int max, value;
-};
-
-class AbstractOutputProgressHandler : public DummyProgressHandler {
+class AbstractOutputProgressHandler : public IProgressHandler {
 public:
 	AbstractOutputProgressHandler();
-	virtual ~AbstractOutputProgressHandler();
 
-	virtual void setValue(int value);
-
-	virtual void update(double percentage, double average_speed, int eta);
+	void begin(progress_t max) override;
+	void incrementValue(progress_t increment) override;
+	virtual void finish();
 
 protected:
+	virtual void update(progress_t max, progress_t value, double percentage, double average_speed, int eta) = 0;
+
+private:
+	void dispatchUpdate(bool force);
+
+	std::mutex update_mutex;
+
+	progress_t max;
+	progress_t value;
+
 	// the time of the start of progress
-	int start;
+	std::time_t start;
 	// time of last update
-	int last_update;
-	// value of last update
-	int last_value;
-	// percentage of last update
-	int last_percentage;
+	std::time_t last_update;
 };
 
 class LogOutputProgressHandler : public AbstractOutputProgressHandler {
 public:
 	LogOutputProgressHandler();
-	virtual ~LogOutputProgressHandler();
 
-	virtual void update(double percentage, double average_speed, int eta);
+protected:
+	void update(progress_t max, progress_t value, double percentage, double average_speed, int eta) override;
 
 private:
-	int last_step;
+	unsigned last_step;
 };
 
 /**
@@ -118,18 +95,15 @@ private:
 class ProgressBar : public AbstractOutputProgressHandler {
 public:
 	ProgressBar();
-	virtual ~ProgressBar();
 
-	virtual void update(double percentage, double average_speed, int eta);
+	void finish() override;
 
-	void finish();
+protected:
+	void update(progress_t max, progress_t value, double percentage, double average_speed, int eta) override;
+
 private:
 	// length of last output needed to clear the line
-	int last_output_len;
-
-	std::string createProgressBar(int width, double percentage) const;
-	std::string createProgressStats(double percentage, int value, int max,
-			double speed_average, int eta = -1) const;
+	unsigned last_output_len;
 };
 
 } /* namespace util */

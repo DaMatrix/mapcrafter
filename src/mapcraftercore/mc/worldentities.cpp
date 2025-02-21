@@ -204,7 +204,7 @@ void WorldEntitiesCache::update(util::IProgressHandler* progress) {
 
 	auto regions = world.getAvailableRegions();
 	if (progress != nullptr)
-		progress->setMax(regions.size());
+		progress->begin(regions.size());
 	for (auto region_it = regions.begin(); region_it != regions.end(); ++region_it) {
 
 		fs::path region_path = world.getRegionPath(*region_it);
@@ -213,7 +213,7 @@ void WorldEntitiesCache::update(util::IProgressHandler* progress) {
 					<< " are cached (mtime region " << fs::last_write_time(region_path)
 					<< " < mtime cache " << timestamp << ").";
 			if (progress != nullptr)
-				progress->setValue(progress->getValue() + 1);
+				progress->incrementValue();
 			continue;
 		} else {
 			LOG(DEBUG) << "Entities of region " << region_path.filename()
@@ -248,7 +248,7 @@ void WorldEntitiesCache::update(util::IProgressHandler* progress) {
 			}
 		}
 		if (progress != nullptr)
-			progress->setValue(progress->getValue() + 1);
+			progress->incrementValue();
 	}
 
 	LOG(DEBUG) << "Writing cache file " << cache_file << " at " << std::time(nullptr) << ".";

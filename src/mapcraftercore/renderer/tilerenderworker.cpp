@@ -90,8 +90,7 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 		try {
 			render_context.map_config.loadImage(image, file);
 			if (render_work.tiles_skip.count(tile) && progress != nullptr)
-				progress->setValue(progress->getValue()
-						+ render_context.tile_set->getContainingRenderTiles(tile));
+				progress->incrementValue(render_context.tile_set->getContainingRenderTiles(tile));
 			return;
 		} catch (const std::exception &e) {
 			LOG(WARNING) << "Unable to read tile '" << file.string()
@@ -129,7 +128,7 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 
 		// update progress
 		if (progress != nullptr)
-			progress->setValue(progress->getValue() + 1);
+			progress->incrementValue();
 	} else {
 		// this tile is a composite tile, we need to compose it from its children
 		// just check, if children 1, 2, 3, 4 exists, render it, resize it to the half size
@@ -186,10 +185,8 @@ void TileRenderWorker::operator()() {
 	int work = 0;
 	for (auto it = render_work.tiles.begin(); it != render_work.tiles.end(); ++it)
 		work += render_context.tile_set->getContainingRenderTiles(*it);
-	if (progress != nullptr) {
-		progress->setMax(work);
-		progress->setValue(0);
-	}
+	if (progress != nullptr)
+		progress->begin(work);
 
 	RGBAImage image;
 	// iterate through the start composite tiles

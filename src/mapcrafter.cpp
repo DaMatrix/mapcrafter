@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 			"the path to the configuration file to use (required)")
 		("render-skip,s", po::value<std::vector<std::string>>(&opts.render_skip)->multitoken(),
 			"skips rendering the specified map(s)")
-		("render-reset,r", "skips rendering all maps")
+		("render-begin,r", "skips rendering all maps")
 		("render-auto,a", po::value<std::vector<std::string>>(&opts.render_auto)->multitoken(),
 			"renders the specified map(s)")
 		("render-force,f", po::value<std::vector<std::string>>(&opts.render_force)->multitoken(),
@@ -168,14 +168,14 @@ int main(int argc, char** argv) {
 	}
 
 	opts.config = arg_config;
-	opts.skip_all = vm.count("render-reset");
+	opts.skip_all = vm.count("render-begin");
 	opts.force_all = vm.count("render-force-all");
 	opts.batch = vm.count("batch");
 	if (!vm.count("logging-config"))
 		opts.logging_config = util::findLoggingConfigFile();
 
 	if (opts.skip_all && opts.force_all) {
-		std::cerr << "You may only use one of --render-reset or --render-force-all!" << std::endl;
+		std::cerr << "You may only use one of --render-begin or --render-force-all!" << std::endl;
 		std::cerr << "Use '" << argv[0] << " --help' for more information." << std::endl;
 		return 1;
 	}

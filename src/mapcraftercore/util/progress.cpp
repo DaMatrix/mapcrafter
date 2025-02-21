@@ -25,6 +25,8 @@
 
 #include <iomanip>
 #include <iostream>
+#include <string>
+#include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -39,7 +41,7 @@
 namespace mapcrafter {
 namespace util {
 
-std::string format_eta(int eta) {
+static std::string format_eta(int eta) {
 	int MINUTES = 60;
 	int HOURS = 60*MINUTES;
 	int DAYS = 24*HOURS;
@@ -70,76 +72,65 @@ std::string format_eta(int eta) {
 	return str_seconds;
 }
 
-MultiplexingProgressHandler::MultiplexingProgressHandler()
-	: max(0), value(0) {
-}
+IProgressHandler::~IProgressHandler() = default;
 
-MultiplexingProgressHandler::~MultiplexingProgressHandler() {
+MultiplexingProgressHandler::MultiplexingProgressHandler() {
 }
 
 void MultiplexingProgressHandler::addHandler(IProgressHandler* handler) {
 	handlers.push_back(handler);
 }
 
-int MultiplexingProgressHandler::getMax() const {
-	return max;
+void MultiplexingProgressHandler::begin(progress_t max) {
+	for (auto& handler : handlers)
+		handler->begin(max);
 }
 
-void MultiplexingProgressHandler::setMax(int max) {
-	this->max = max;
-	for (auto handler_it = handlers.begin(); handler_it != handlers.end(); ++handler_it)
-		(*handler_it)->setMax(max);
-}
-
-int MultiplexingProgressHandler::getValue() const {
-	return value;
-}
-
-void MultiplexingProgressHandler::setValue(int value) {
-	this->value = value;
-	for (auto handler_it = handlers.begin(); handler_it != handlers.end(); ++handler_it)
-		(*handler_it)->setValue(value);
-}
-
-DummyProgressHandler::DummyProgressHandler()
-	: max(0), value(0) {
-}
-
-DummyProgressHandler::~DummyProgressHandler() {
-}
-
-int DummyProgressHandler::getMax() const {
-	return max;
-}
-
-void DummyProgressHandler::setMax(int max) {
-	this->max = max;
-}
-
-int DummyProgressHandler::getValue() const {
-	return value;
-}
-
-void DummyProgressHandler::setValue(int value) {
-	this->value = value;
+void MultiplexingProgressHandler::incrementValue(progress_t increment) {
+	for (auto& handler : handlers)
+		handler->incrementValue(increment);
 }
 
 AbstractOutputProgressHandler::AbstractOutputProgressHandler()
-	: start(std::time(nullptr)), last_update(0), last_value(0), last_percentage(0) {
+	: max(0), value(0), start(0), last_update(0) {
 }
 
-AbstractOutputProgressHandler::~AbstractOutputProgressHandler() {
+void AbstractOutputProgressHandler::begin(progress_t max) {
+	std::lock_guard<std::mutex> update_lock(update_mutex);
+	assert(start == 0 && "already started??");
+	this->max = max;
+	this->value = 0;
+	start = std::time(nullptr);
+	last_update = 0;
+	dispatchUpdate(true);
 }
 
-void AbstractOutputProgressHandler::setValue(int value) {
-	int now = std::time(nullptr);
+void AbstractOutputProgressHandler::incrementValue(progress_t increment) {
+	std::lock_guard<std::mutex> update_lock(update_mutex);
+	assert(start != 0 && "not started yet?");
+	assert(value + increment <= max);
+	value += increment;
+	dispatchUpdate(false);
+}
+
+void AbstractOutputProgressHandler::finish() {
+	std::lock_guard<std::mutex> update_lock(update_mutex);
+	if (start == 0)
+		return; //do nothing if not yet started
+	value = max;
+	dispatchUpdate(true);
+}
+
+void AbstractOutputProgressHandler::dispatchUpdate(bool force) {
+	std::time_t now = std::time(nullptr);
+
 	// check whether the time since the last shown update
 	// and the change was big enough to show a new update
-	double percentage = value / (double) max * 100.;
-	if (last_update + 1 > now && !(last_percentage != max && value == max)) {
-		this->value = value;
+	bool should_show_update = force || value == max || last_update < now;
+	if (!should_show_update)
 		return;
-	}
+
+	double percentage = value / (double) max * 100.;
 
 	// now calculate the average speed
 	double average_speed = (double) value / (now - start);
@@ -151,27 +142,16 @@ void AbstractOutputProgressHandler::setValue(int value) {
 
 	// set this as last update
 	last_update = now;
-	last_value = value;
-	last_percentage = percentage;
-
-	this->value = value;
 
 	// call handler
-	update(percentage, average_speed, eta);
-}
-
-void AbstractOutputProgressHandler::update(double percentage, double average_speed,
-		int eta) {
+	update(max, value, percentage, average_speed, eta);
 }
 
 LogOutputProgressHandler::LogOutputProgressHandler()
 	: last_step(0) {
 }
 
-LogOutputProgressHandler::~LogOutputProgressHandler() {
-}
-
-void LogOutputProgressHandler::update(double percentage, double average_speed,
+void LogOutputProgressHandler::update(progress_t max, progress_t value, double percentage, double average_speed,
 		int eta) {
 	if (percentage < last_step + 5)
 		return;
@@ -182,7 +162,7 @@ void LogOutputProgressHandler::update(double percentage, double average_speed,
 	log << std::floor(percentage) << "% complete. ";
 	log << "Processed " << value << "/" << max << " items ";
 	log << "with average " << std::setprecision(1) << std::fixed << average_speed << "/s.";
-	if (eta != -1)
+	if (eta >= 0)
 		log << " ETA " << util::format_eta(eta) << ".";
 }
 
@@ -190,10 +170,45 @@ ProgressBar::ProgressBar()
 	: last_output_len(0) {
 }
 
-ProgressBar::~ProgressBar() {
+static std::string createProgressBar(unsigned width, double percentage) {
+	// width - 2 because we need two characters for [ and ]
+	width -= 2;
+
+	std::string progressbar = "[";
+	double progress_step = (double) 100 / width;
+	for (int i = 0; i < width; i++) {
+		double current = progress_step * i;
+		if (current > percentage)
+			progressbar += " ";
+		else if (percentage - progress_step < current)
+			progressbar += ">";
+		else
+			progressbar += "=";
+	}
+	return progressbar + "]";
 }
 
-void ProgressBar::update(double percentage, double average_speed, int eta) {
+static std::string createProgressStats(double percentage, IProgressHandler::progress_t value,
+	   IProgressHandler::progress_t max, double speed_average, int eta) {
+	std::string stats;
+	char formatted_percent[20], formatted_speed_average[20];
+	sprintf(&formatted_percent[0], "%.2f%%", percentage);
+	sprintf(&formatted_speed_average[0], "%.2f", speed_average);
+	stats.append(formatted_percent).append(" ");
+	stats.append(std::to_string(value)).append("/").append(std::to_string(max)).append(" ");
+	stats.append(formatted_speed_average).append("/s ");
+
+	if (eta >= 0)
+		stats.append("ETA ").append(format_eta(eta));
+
+	// add some padding to these stats
+	// to prevent the progress bar changing the size all the time
+	int padding = 20 - (stats.size() % 20);
+	stats.append(padding, ' ');
+	return stats;
+}
+
+void ProgressBar::update(progress_t max, progress_t value, double percentage, double average_speed, int eta) {
 	// try to determine the width of the terminal
 	// use 80 columns as default if we can't determine a terminal size
 	int terminal_width = 80;
@@ -227,53 +242,14 @@ void ProgressBar::update(double percentage, double average_speed, int eta) {
 
 	// now show everything
 	// also go back to beginning of line after it, in case there is other output
-	std::cout << progressbar << " " << stats << "\r";
-	std::cout.flush();
+	std::cout << progressbar << " " << stats << "\r" << std::flush;
 
 	// set this as last shown
 	last_output_len = progressbar.size() + 1 + stats.size();
 }
 
-std::string ProgressBar::createProgressBar(int width, double percentage) const {
-	// width - 2 because we need two characters for [ and ]
-	width -= 2;
-
-	std::string progressbar = "[";
-	double progress_step = (double) 100 / width;
-	for (int i = 0; i < width; i++) {
-		double current = progress_step * i;
-		if (current > percentage)
-			progressbar += " ";
-		else if (percentage - progress_step < current)
-			progressbar += ">";
-		else
-			progressbar += "=";
-	}
-	return progressbar + "]";
-}
-
-std::string ProgressBar::createProgressStats(double percentage, int value, int max,
-		double speed_average, int eta) const {
-	std::string stats;
-	char formatted_percent[20], formatted_speed_average[20];
-	sprintf(&formatted_percent[0], "%.2f%%", percentage);
-	sprintf(&formatted_speed_average[0], "%.2f", speed_average);
-	stats.append(formatted_percent).append(" ");
-	stats.append(std::to_string(value)).append("/").append(std::to_string(max)).append(" ");
-	stats.append(formatted_speed_average).append("/s ");
-
-	if (eta != -1)
-		stats.append("ETA ").append(format_eta(eta));
-
-	// add some padding to these stats
-	// to prevent the progress bar changing the size all the time
-	int padding = 20 - (stats.size() % 20);
-	stats.append(padding, ' ');
-	return stats;
-}
-
 void ProgressBar::finish() {
-	setValue(max);
+	AbstractOutputProgressHandler::finish();
 	std::cout << std::endl;
 }
 

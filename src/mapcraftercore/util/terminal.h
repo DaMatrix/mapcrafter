@@ -45,7 +45,7 @@ enum class TerminalColorStates {
  * or better: out << setfgcolor(setcolor::red) << "Red text";
  * You can set the background color with setcolor::background/setbgcolor.
  *
- * You can reset the text color with: out << setcolor::reset;
+ * You can reset the text color with: out << setcolor::begin;
  */
 class setcolor {
 public:
