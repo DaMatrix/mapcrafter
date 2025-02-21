@@ -439,33 +439,18 @@ const std::vector<std::pair<std::string, std::set<RenderRotation::Direction> > >
 	return required_maps;
 }
 
-bool RenderManager::copyTemplateFile(const std::string& filename,
+void RenderManager::copyTemplateFile(const std::string& filename,
 		const std::map<std::string, std::string>& vars) const {
-	std::ifstream file(config.getTemplatePath(filename).string().c_str());
-	if (!file)
-		return false;
-	std::stringstream ss;
-	ss << file.rdbuf();
-	file.close();
-	std::string data = ss.str();
+	std::string data;
+	fs::load_string_file(config.getTemplatePath(filename), data);
 
-	for (auto it = vars.begin(); it != vars.end(); ++it)
-		data = util::replaceAll(data, "{" + it->first + "}", it->second);
+	for (auto& var : vars)
+		data = util::replaceAll(data, "{" + var.first + "}", var.second);
 
-	std::ofstream out(config.getOutputPath(filename).string().c_str());
-	if (!out)
-		return false;
-	out << data;
-	out.close();
-	return true;
+	fs::save_string_file(config.getOutputPath(filename), data);
 }
 
-bool RenderManager::copyTemplateFile(const std::string& filename) const {
-	std::map<std::string, std::string> vars;
-	return copyTemplateFile(filename, vars);
-}
-
-bool RenderManager::writeTemplateIndexHtml() const {
+void RenderManager::writeTemplateIndexHtml() const {
 	std::map<std::string, std::string> vars;
 	vars["version"] = MAPCRAFTER_VERSION;
 	if (strlen(MAPCRAFTER_GITVERSION))
@@ -478,7 +463,7 @@ bool RenderManager::writeTemplateIndexHtml() const {
 
 	vars["backgroundColor"] = config.getBackgroundColor().hex;
 
-	return copyTemplateFile("index.html", vars);
+	copyTemplateFile("index.html", vars);
 }
 
 void RenderManager::writeTemplates() const {
@@ -487,18 +472,13 @@ void RenderManager::writeTemplates() const {
 		return;
 	}
 
-	if (!writeTemplateIndexHtml())
-		LOG(ERROR) << "Warning: Unable to copy template file index.html!";
+	writeTemplateIndexHtml();
 	web_config.writeConfigJS();
 
-	if (!fs::exists(config.getOutputPath("markers.js"))
-			&& !util::copyFile(config.getTemplatePath("markers.js"), config.getOutputPath("markers.js")))
-		LOG(WARNING) << "Unable to copy template file markers.js!";
+	fs::copy_file(config.getTemplatePath("markers.js"), config.getOutputPath("markers.js"), fs::copy_options::skip_existing);
 
 	// copy all other files and directories
-	fs::directory_iterator end;
-	for (fs::directory_iterator it(config.getTemplateDir()); it != end;
-			++it) {
+	for (fs::directory_iterator it(config.getTemplateDir()), end; it != end; ++it) {
 		std::string filename = BOOST_FS_FILENAME(it->path());
 		// do not copy the index.html
 		if (filename == "index.html")
@@ -507,13 +487,10 @@ void RenderManager::writeTemplates() const {
 		if ((filename == "markers.js" || filename == "markers-generated.js")
 				&& fs::exists(config.getOutputPath(filename)))
 			continue;
-		if (fs::is_regular_file(*it)) {
-			if (!util::copyFile(*it, config.getOutputPath(filename)))
-				LOG(WARNING) << "Unable to copy template file " << filename;
-		} else if (fs::is_directory(*it)) {
-			if (!util::copyDirectory(*it, config.getOutputPath(filename)))
-				LOG(WARNING) << "Unable to copy template directory " << filename;
-		}
+
+		fs::copy(
+			*it, config.getOutputPath(filename),
+			fs::copy_options::recursive | fs::copy_options::update_existing | fs::copy_options::copy_symlinks);
 	}
 }
 

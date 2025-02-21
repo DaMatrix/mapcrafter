@@ -54,18 +54,17 @@ bool WebConfig::readConfigJS() {
 	// try to read config.js file or migrate old map.settings files
 	if (fs::is_regular_file(config.getOutputPath("config.js"))) {
 		// TODO check if map/world configuration has changed?
-		static std::string try_again = "Please fix the problem in the config.js file "
+		static auto try_again = "Please fix the problem in the config.js file "
 			"or delete the corrupt file (Warning: You will have to render your maps again).";
 
-		std::ifstream in(config.getOutputPath("config.js").string());
-		if (!in) {
+		std::string config_data;
+		try {
+			fs::load_string_file(config.getOutputPath("config.js"), config_data);
+		} catch (...) {
 			LOG(FATAL) << "Unable to open config.js file!";
 			LOG(FATAL) << try_again;
 			return false;
 		}
-		std::stringstream ss;
-		ss << in.rdbuf();
-		std::string config_data = ss.str();
 		if (!util::startswith(config_data, "var CONFIG = ")) {
 			LOG(FATAL) << "Invalid config.js file! "
 					<< "'var CONFIG = ' is expected at beginning of file!";
@@ -154,14 +153,10 @@ bool WebConfig::readConfigJS() {
 }
 
 void WebConfig::writeConfigJS() const {
-	std::ofstream out(config.getOutputPath("config.js").string());
-	if (!out) {
-		LOG(ERROR) << "Unable to write config.js file!";
-		return;
-	}
 	// TODO write world/map config to check if it was changed next time we read config.js?
-	out << "var CONFIG = " << util::trim(getConfigJSON().serialize(true)) << ";" << std::endl;
-	out.close();
+	fs::save_string_file(
+		config.getOutputPath("config.js"),
+		"var CONFIG = " + util::trim(getConfigJSON().serialize(true)) + ';');
 }
 
 int WebConfig::getTileSetsMaxZoom(const TileSetGroupID& tile_set) const {

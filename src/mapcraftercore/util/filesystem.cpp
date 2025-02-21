@@ -35,40 +35,6 @@
 namespace mapcrafter {
 namespace util {
 
-bool copyFile(const fs::path& from, const fs::path& to) {
-	std::ifstream in(from.string().c_str(), std::ios::binary);
-	if (!in)
-		return false;
-	std::ofstream out(to.string().c_str(), std::ios::binary);
-	if (!out)
-		return false;
-
-	out << in.rdbuf();
-	if (out.bad())
-		return false;
-	in.close();
-	out.close();
-	return true;
-}
-
-bool copyDirectory(const fs::path& from, const fs::path& to) {
-	if (!fs::exists(from) || !fs::is_directory(from))
-		return false;
-	if (!fs::exists(to) && !fs::create_directories(to))
-		return false;
-	fs::directory_iterator end;
-	for (fs::directory_iterator it(from); it != end; ++it) {
-		if (fs::is_regular_file(*it)) {
-			if (!copyFile(*it, to / it->path().filename()))
-				return false;
-		} else if (fs::is_directory(*it)) {
-			if (!copyDirectory(*it, to / it->path().filename()))
-				return false;
-		}
-	}
-	return true;
-}
-
 bool moveFile(const fs::path& from, const fs::path& to) {
 	if (!fs::exists(from) || (fs::exists(to) && !fs::remove(to)))
 		return false;

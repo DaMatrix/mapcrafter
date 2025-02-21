@@ -165,18 +165,13 @@ private:
 	 * Copies a file from the template directory to the output directory and replaces the
 	 * variables from the map (every "{key}" in the file becomes "value").
 	 */
-	bool copyTemplateFile(const std::string& filename,
+	void copyTemplateFile(const std::string& filename,
 			const std::map<std::string, std::string>& vars) const;
-
-	/**
-	 * Copes a file from the template directory to the output directory.
-	 */
-	bool copyTemplateFile(const std::string& filename) const;
 
 	/**
 	 * Writes the index.html template file (replaces some template special variables).
 	 */
-	bool writeTemplateIndexHtml() const;
+	void writeTemplateIndexHtml() const;
 
 	/**
 	 * Copies all template files to the output directory (including special handling for
