@@ -24,16 +24,18 @@
 #include "../mc/world.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <set>
-#include <sstream>
 
 namespace mapcrafter {
 namespace renderer {
+
+static int computeRadiusFromDepth(int depth) {
+	return (1 << depth) / 2;
+}
 
 TilePos::TilePos(int x, int y)
 	: x(x), y(y) {
@@ -98,10 +100,6 @@ int TilePath::getDepth() const {
 	return path.size();
 }
 
-const std::vector<int>& TilePath::getPath() const {
-	return path;
-}
-
 TilePath TilePath::parent() const {
 	TilePath copy(*this);
 	copy.path.pop_back();
@@ -110,14 +108,13 @@ TilePath TilePath::parent() const {
 
 TilePos TilePath::getTilePos() const {
 	// calculate the radius of all tiles on the top zoom level (2^zoomlevel / 2)
-	int radius = pow(2, path.size()) / 2;
+	int radius = computeRadiusFromDepth(path.size());
 	// the startpoint is top left
 	int x = -radius;
 	int y = -radius;
-	for (size_t i = 0; i < path.size(); i++) {
+	for (uint8_t tile : path) {
 		// now for every zoom level:
-		// get the current tile
-		int tile = path[i];
+
 		// increase x by the radius if this tile is on the right side (2 or 4)
 		if (tile == 2 || tile == 4)
 			x += radius;
@@ -148,25 +145,33 @@ bool TilePath::operator<(const TilePath& other) const {
 }
 
 std::ostream& operator<<(std::ostream& stream, const TilePath& path) {
-	stream << path.toString();
-	return stream;
+	return stream << path.toString();
 }
 
 std::string TilePath::toString() const {
-	std::stringstream ss;
+	/*std::stringstream ss;
 	for (size_t i = 0; i < path.size(); i++) {
 		ss << path[i];
 		if (i != path.size() - 1)
 			ss << "/";
 	}
-	return ss.str();
+	return ss.str();*/
+
+	std::string result(path.empty() ? 0 : (path.size() * 2 - 1), '/');
+	auto result_itr = result.begin();
+	for (uint8_t tile : path) {
+		assert(tile >= 1 && tile <= 4);
+		*result_itr = tile + '0';
+		result_itr += 2;
+	}
+	return result;
 }
 
 TilePath TilePath::byTilePos(const TilePos& tile, int depth) {
 	TilePath path;
 
 	// at first calculate the radius in tiles of this zoom level
-	int radius = pow(2, depth) / 2;
+	int radius = computeRadiusFromDepth(depth);
 	// check if the tile is in this bounds
 	if (tile.getX() > radius  || tile.getY() > radius
 			|| tile.getX() < -radius || tile.getY() < -radius)
@@ -301,7 +306,7 @@ void TileSet::findRenderTiles(const mc::World& world, bool auto_center,
 	for (min_depth = 0; min_depth < 32; min_depth++) {
 		// for each level calculate the radius and check if the tiles fit in this bounds
 		// also don't forget the tile offset
-		int radius = pow(2, min_depth) / 2;
+		int radius = computeRadiusFromDepth(min_depth);
 		if (tiles_x_min - tile_offset.getX() > -radius
 				&& tiles_x_max - tile_offset.getX() < radius
 				&& tiles_y_min - tile_offset.getY() > -radius

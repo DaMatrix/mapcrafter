@@ -119,11 +119,6 @@ public:
 	int getDepth() const;
 
 	/**
-	 * Returns the path.
-	 */
-	const std::vector<int>& getPath() const;
-
-	/**
 	 * Returns the path of the parent tile.
 	 * For example: The parent path of 1/2/3/4 is 1/2/3.
 	 */
@@ -156,7 +151,7 @@ public:
 	static TilePath byTilePos(const TilePos& tile, int depth);
 
 private:
-	std::vector<int> path;
+	std::vector<uint8_t> path;
 };
 
 std::ostream& operator<<(std::ostream& stream, const TilePath& path);
