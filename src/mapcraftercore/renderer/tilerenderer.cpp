@@ -121,7 +121,7 @@ void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 
 	size_t tile_images_capacity_value = tile_images_maxsize;
 
-	boost::container::vector<TileImage> tile_images;
+	std::vector<TileImage> tile_images;
     tile_images.reserve(tile_images_capacity_value * 2);
 	renderTopBlocks(tile_pos, tile_images);
 
@@ -152,7 +152,7 @@ int TileRenderer::getTileHeight() const {
 	return getTileSize();
 }
 
-void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockDir& dir, boost::container::vector<TileImage>& tile_images) {
+void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockDir& dir, std::vector<TileImage>& tile_images) {
 
 	for (; top.y >= mc::CHUNK_LOWEST*16 ; top += dir) {
 		// get current chunk position
