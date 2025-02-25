@@ -109,21 +109,6 @@ uint32_t ColorMap::getColor(float x, float y) const {
 BlockImages::~BlockImages() {
 }
 
-AUTO_TARGET_CLONES void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
-		FaceIndex except_face, float factor_in) {
-	assert(block.isSameSize(uv_mask));
-	auto factor = NormalizedUInt8::fromFloatingPoint(factor_in);
-
-	//trivially vectorizable loop
-	std::transform(
-		block.begin(), block.end(), uv_mask.begin(), block.begin(),
-		[except_face, factor](RGBAPixel pixel, RGBAPixel uv_pixel) -> RGBAPixel {
-			return rgba_alpha(uv_pixel) != 0 && rgba_blue(uv_pixel) != except_face
-				       ? rgba_multiply_scalar(pixel, factor)
-				       : pixel;
-		});
-}
-
 namespace {
 
 inline uint32_t mix(uint32_t x, uint32_t y, uint32_t a) {
@@ -271,7 +256,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 }
 #endif
 
-AUTO_TARGET_CLONES void blockImageMultiplyScalar(RGBAImage &block, NormalizedUInt8 factor) {
+AUTO_TARGET_CLONES void blockImageMultiplyScalarKeepAlpha(RGBAImage &block, NormalizedUInt8 factor) {
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
@@ -280,24 +265,29 @@ AUTO_TARGET_CLONES void blockImageMultiplyScalar(RGBAImage &block, NormalizedUIn
 		});
 }
 
-AUTO_TARGET_CLONES void blockImageTint(RGBAImage &block, const RGBAImage &mask, RGBAPixel color) {
-	assert(block.isSameSize(mask));
+AUTO_TARGET_CLONES void blockImageMultiplyScalarKeepAlphaExceptFace(RGBAImage& block, const RGBAImage& uv_mask,
+		FaceIndex except_face, float factor_in) {
+	assert(block.isSameSize(uv_mask));
+	auto factor = NormalizedUInt8::fromFloatingPoint(factor_in);
 
+	//trivially vectorizable loop
 	std::transform(
-		block.begin(), block.end(), mask.begin(), block.begin(),
-		[color](RGBAPixel pixel, RGBAPixel mask_pixel) -> RGBAPixel {
-			if (rgba_alpha(mask_pixel)) {
-				// The mask is not supposed to be transfered directly
-				// but to be blend in with block pixel
-				// This will avoid white pixels on edges of the mask
-				RGBAPixel colored_mask_pixel = rgba_multiply(mask_pixel, color);
-				pixel = rgba_alphablend(pixel, colored_mask_pixel);
-			}
-			return pixel;
+		block.begin(), block.end(), uv_mask.begin(), block.begin(),
+		[except_face, factor](RGBAPixel pixel, RGBAPixel uv_pixel) -> RGBAPixel {
+			return rgba_alpha(uv_pixel) != 0 && rgba_blue(uv_pixel) != except_face
+				       ? rgba_multiply_scalar(pixel, factor)
+				       : pixel;
 		});
 }
 
-AUTO_TARGET_CLONES void blockImageMultiplyInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color) {
+void blockImageMultiplyKeepAlpha(RGBAImage& block, RGBAPixel color) {
+	blockImageMultiplyKeepAlphaInto(block, block, color);
+}
+
+void blockImageMultiplyWithAlpha(RGBAImage& block, RGBAPixel color) {
+	blockImageMultiplyWithAlphaInto(block, block, color);
+}
+AUTO_TARGET_CLONES void blockImageMultiplyKeepAlphaInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color) {
 	assert(dst.isSameSize(src));
 
 	std::transform(
@@ -317,12 +307,20 @@ AUTO_TARGET_CLONES void blockImageMultiplyWithAlphaInto(RGBAImage& dst, const RG
 		});
 }
 
-AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color) {
-	//trivially vectorizable loop
+AUTO_TARGET_CLONES void blockImageMultiplyKeepAlphaMasked(RGBAImage& block, const RGBAImage& mask, RGBAPixel color) {
+	assert(block.isSameSize(mask));
+
 	std::transform(
-		block.begin(), block.end(), block.begin(),
-		[color](RGBAPixel pixel) -> RGBAPixel {
-			return rgba_multiply(pixel, color);
+		block.begin(), block.end(), mask.begin(), block.begin(),
+		[color](RGBAPixel pixel, RGBAPixel mask_pixel) -> RGBAPixel {
+			if (rgba_alpha(mask_pixel)) {
+				// The mask is not supposed to be transfered directly
+				// but to be blend in with block pixel
+				// This will avoid white pixels on edges of the mask
+				RGBAPixel colored_mask_pixel = rgba_multiply(mask_pixel, color);
+				pixel = rgba_alphablend(pixel, colored_mask_pixel);
+			}
+			return pixel;
 		});
 }
 
@@ -375,7 +373,7 @@ AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAI
 }
 
 AUTO_TARGET_CLONES void blockImageStripSidesInto(RGBAImage& dst, const RGBAImage& src, const RGBAImage& uv_mask, bool strip_up, bool strip_left, bool strip_right) {
-	assert(dst.isSameSize(block));
+	assert(dst.isSameSize(src));
 	assert(dst.isSameSize(uv_mask));
 
 	/*for (int i=0; i<tile_image.image.width*tile_image.image.height; i++) {
@@ -772,12 +770,11 @@ const BlockImage& RenderedBlockImages::getBlockImage(uint16_t id) const {
 	return *block_images[id];
 }
 
-void RenderedBlockImages::prepareBiomeBlockImage(RGBAImage& image, const BlockImage& block, uint32_t color) {
-
+void RenderedBlockImages::prepareBiomeBlockImage(RGBAImage& image, const BlockImage& block, RGBAPixel color) {
 	if (block.is_masked_biome) {
-		blockImageTint(image, *block.biome_mask, color);
+		blockImageMultiplyKeepAlphaMasked(image, *block.biome_mask, color);
 	} else {
-		blockImageTint(image, color);
+		blockImageMultiplyKeepAlpha(image, color);
 	}
 }
 

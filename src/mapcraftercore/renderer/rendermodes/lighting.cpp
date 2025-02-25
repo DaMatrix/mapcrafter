@@ -195,7 +195,7 @@ void LightingRenderMode::draw(RGBAImage& image, const BlockImage& block_image,
 			blockImageMultiply(image, block_image.uv_image(0), id, id, up, DEFAULT_LIGHT_FNC);
 
 		float factor = getLightingColor(pos, intensity);
-		blockImageMultiplyExcept(image, block_image.uv_image(0), FACE_UP_INDEX, factor);
+		blockImageMultiplyScalarKeepAlphaExceptFace(image, block_image.uv_image(0), FACE_UP_INDEX, factor);
 	} else if (block_image.lighting_type == LightingType::SMOOTH_BOTTOM) {
 		CornerValues left = getCornerColors(pos, CORNERS_LEFT, intensity);
 		CornerValues right = getCornerColors(pos, CORNERS_RIGHT, intensity);
@@ -322,7 +322,7 @@ void LightingRenderMode::doSimpleLight(RGBAImage& image, const BlockImage& block
 		return;
 	}
 
-	blockImageMultiplyScalar(image, factor);
+	blockImageMultiplyScalarKeepAlpha(image, factor);
 }
 
 } /* namespace render */

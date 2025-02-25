@@ -99,9 +99,6 @@ struct LightFnc {
     }
 };
 
-AUTO_TARGET_CLONES void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
-		FaceIndex except_face, float factor);
-
 #if HAVE_EXPLICIT_SIMD && __x86_64__ && !__AVX2__ && HAVE_ATTRIBUTE_TARGET_AVX2
 __attribute__((target("avx2")))
 void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
@@ -113,14 +110,18 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
 		const LightFnc& light_fnc);
 
-AUTO_TARGET_CLONES void blockImageMultiplyScalar(RGBAImage& block, NormalizedUInt8 factor);
-AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageMultiplyScalarKeepAlpha(RGBAImage& block, NormalizedUInt8 factor);
+AUTO_TARGET_CLONES void blockImageMultiplyScalarKeepAlphaExceptFace(RGBAImage& block, const RGBAImage& uv_mask,
+		FaceIndex except_face, float factor);
 
-AUTO_TARGET_CLONES void blockImageMultiplyInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color);
+void blockImageMultiplyKeepAlpha(RGBAImage& block, RGBAPixel color);
+void blockImageMultiplyWithAlpha(RGBAImage& block, RGBAPixel color);
+
+AUTO_TARGET_CLONES void blockImageMultiplyKeepAlphaInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color);
 AUTO_TARGET_CLONES void blockImageMultiplyWithAlphaInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color);
 
-// TODO maybe this should be named something with multiply too
-AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageMultiplyKeepAlphaMasked(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
+
 AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, RGBAPixel color);
 AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color);
 
@@ -233,7 +234,7 @@ public:
 	virtual RGBAImage exportBlocks() const;
 
 	const BlockImage& getBlockImage(uint16_t id) const;
-	void prepareBiomeBlockImage(RGBAImage& image, const BlockImage& block, uint32_t color);
+	void prepareBiomeBlockImage(RGBAImage& image, const BlockImage& block, RGBAPixel color);
 
 	virtual int getTextureSize() const;
 	virtual int getBlockSize() const;
