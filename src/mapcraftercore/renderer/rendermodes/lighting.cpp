@@ -322,7 +322,7 @@ void LightingRenderMode::doSimpleLight(RGBAImage& image, const BlockImage& block
 		return;
 	}
 
-	blockImageMultiply(image, factor);
+	blockImageMultiplyScalar(image, factor);
 }
 
 } /* namespace render */

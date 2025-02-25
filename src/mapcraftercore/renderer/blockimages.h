@@ -113,13 +113,20 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
 		const LightFnc& light_fnc);
 
-AUTO_TARGET_CLONES void blockImageMultiply(RGBAImage& block, NormalizedUInt8 factor);
+AUTO_TARGET_CLONES void blockImageMultiplyScalar(RGBAImage& block, NormalizedUInt8 factor);
 AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
+
+AUTO_TARGET_CLONES void blockImageMultiplyInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageMultiplyWithAlphaInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color);
 
 // TODO maybe this should be named something with multiply too
 AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color);
 AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, RGBAPixel color);
 AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color);
+
+AUTO_TARGET_CLONES void blockImageStripSidesInto(RGBAImage& dst, const RGBAImage& src, const RGBAImage& uv_mask,
+	bool strip_up, bool strip_left, bool strip_right);
+
 void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 		const RGBAImage& top, const RGBAImage& top_uv_mask);
 void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,

@@ -95,7 +95,6 @@ protected:
 
 	const BlockImage& waterlog_full_image;
 	const BlockImage& waterlog_shore_image;
-	TileImage tile_image;
 	RGBAImage waterLogTinted;
 };
 

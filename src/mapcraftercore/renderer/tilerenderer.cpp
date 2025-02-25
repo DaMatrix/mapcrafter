@@ -49,8 +49,7 @@ TileRenderer::TileRenderer(const RenderView* render_view, mc::BlockStateRegistry
 			block_images->getBlockImage(
 				block_registry.getBlockID(
 					mc::BlockState::parse("minecraft:water_mask", "level=2" )))),
-		tile_image(waterlog_full_image.image(0).width, waterlog_full_image.image(0).height),
-		waterLogTinted(tile_image.image.width, tile_image.image.height) {
+		waterLogTinted(waterlog_full_image.image(0).width, waterlog_full_image.image(0).height) {
 	assert(block_images);
 	render_mode->initialize(render_view, images, world, &current_chunk);
 	// Pre-allocate rendering buffers
@@ -230,10 +229,12 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 		const RGBAImage& uv_image = block_image->uv_image(alt);
 
 		// Prep the tile
+		tile_images.emplace_back();
+		TileImage& tile_image = tile_images.back();
 		tile_image.x = x;
 		tile_image.y = y;
 		tile_image.pos = top;
-		tile_image.image.setSize(image.width,image.height);
+		tile_image.image.setSize(image.width, image.height);
 
 		// Only display if there's something to print
 		// This applies for water blocks, where we print
@@ -245,33 +246,12 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			bool strip_right = false;
 			if (block_image->can_partial) {
 				strip_up    = id == id_top;
-				strip_right = id == id_south;
 				strip_left  = id == id_west;
+				strip_right = id == id_south;
 			}
 
 			if (strip_up || strip_left || strip_right) {
-				for (int i=0; i<tile_image.image.width*tile_image.image.height; i++) {
-					RGBAPixel puv = uv_image.data[i];
-					RGBAPixel p = image.data[i];
-					switch(rgba_blue(puv)) {
-						case FACE_UP_INDEX:
-							if (strip_up) {
-								p = 0;
-							}
-							break;
-						case FACE_LEFT_INDEX:
-							if (strip_left) {
-								p = 0;
-							}
-							break;
-						case FACE_RIGHT_INDEX:
-							if (strip_right) {
-								p = 0;
-							}
-							break;
-					}
-					tile_image.image.data[i] = p;
-				}
+				blockImageStripSidesInto(tile_image.image, image, uv_image, strip_up, strip_left, strip_right);
 			} else {
                 tile_image.image = image;
 			}
@@ -332,69 +312,23 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 				waterlog_uv = &waterlog_shore_image.uv_image(0);
 			}
 
-			uint32_t biome_color = getBiomeColor(top, waterlog_full_image, current_chunk);
+			RGBAPixel biome_color = getBiomeColor(top, waterlog_full_image, current_chunk);
 			mc::Block block = getBlock(top, mc::GET_ID | mc::GET_LIGHT);
 			float light = std::max(block.sky_light, block.block_light) / 15.0f;
 			biome_color = rgba(rgba_red(biome_color) * light, rgba_green(biome_color) * light, rgba_blue(biome_color) * light, (render_view->getWaterOpacity() * 255));
 
-			auto pit      = waterlog->begin();
-			auto pitend   = waterlog->end();
-			auto puvit    = waterlog_uv->begin();
-			auto pdestit        = waterLogTinted.begin();
-
 			if ((water_top || water_south || water_west) == false) {
 				// fast lane
 				// Nothing to clip, just render the whole water block with biome color
-				while (pit != pitend)
-				{
-					RGBAPixel p = *pit;
-					if (p) {
-						p = rgba_multiply_with_alpha(p, biome_color);
-					}
-					*pdestit = p;
-					pit ++;
-					puvit ++;
-					pdestit ++;
-				}
+				blockImageMultiplyWithAlphaInto(waterLogTinted, *waterlog, biome_color);
 			} else {
 				// Clip the some faces, and multiply by biome color
-				while (pit != pitend)
-				{
-					RGBAPixel p = *pit;
-					if (p) {
-						RGBAPixel puv = *puvit;
-						switch(rgba_blue(puv)){
-							case FACE_UP_INDEX:
-								if(water_top) {
-									p = 0;
-								}
-								break;
-							case FACE_LEFT_INDEX:
-								if(water_west) {
-									p = 0;
-								}
-								break;
-							case FACE_RIGHT_INDEX:
-								if(water_south) {
-									p = 0;
-								}
-								break;
-						}
-						if (p) {
-							p = rgba_multiply_with_alpha(p, biome_color);
-						}
-					}
-					*pdestit = p;
-					pit ++;
-					puvit ++;
-					pdestit ++;
-				}
+				blockImageStripSidesInto(waterLogTinted, *waterlog, *waterlog_uv, water_top, water_west, water_south);
+				blockImageMultiplyWithAlphaInto(waterLogTinted, waterLogTinted, biome_color);
 			}
 
 			blockImageBlendZBuffered(tile_image.image, uv_image, waterLogTinted, *waterlog_uv);
 		}
-
-		tile_images.push_back(tile_image);
 
 		// if this block is not transparent, then stop looking for more blocks
 		if (!block_image->is_transparent) {

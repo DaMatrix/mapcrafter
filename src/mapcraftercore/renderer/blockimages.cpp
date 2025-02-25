@@ -109,7 +109,7 @@ uint32_t ColorMap::getColor(float x, float y) const {
 BlockImages::~BlockImages() {
 }
 
-void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
+AUTO_TARGET_CLONES void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
 		FaceIndex except_face, float factor_in) {
 	assert(block.isSameSize(uv_mask));
 	auto factor = NormalizedUInt8::fromFloatingPoint(factor_in);
@@ -150,7 +150,7 @@ static void blockImageMultiply_scalar(
 	for (; i < n; i++) {
         uint32_t pixel = block[i];
         uint32_t uv_pixel = uv_mask[i];
-        if (uv_pixel != 0) {
+        if (rgba_alpha(uv_pixel) != 0) {
             uint32_t u = rgba_red(uv_pixel);
             uint32_t v = rgba_green(uv_pixel);
             uint32_t side = rgba_blue(uv_pixel);
@@ -199,12 +199,13 @@ static size_t blockImageMultiply_AVX2(
     };
 
     uint32x8 f_lookup = { f[0], f[1], f[2], 0, 0, 0, 0, 0 };
+	uint32x8 alpha_mask = (uint32x8) _mm256_set1_epi32(rgba(0, 0, 0, 255));
 
     for (; i < n - 7; i += 8) {
         uint32x8 pixel = (uint32x8) _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&block[i]));
         uint32x8 uv_pixel = (uint32x8) _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&uv_mask[i]));
 
-        if (_mm256_testz_si256((__m256i) uv_pixel, (__m256i) uv_pixel)) { //all pixels are zero
+        if (_mm256_testz_si256((__m256i) uv_pixel, (__m256i) alpha_mask)) { //all pixels' alpha channels are zero
             continue;
         }
 
@@ -220,7 +221,7 @@ static size_t blockImageMultiply_AVX2(
         // apply light function
         x = (uint32x8) _mm256_i32gather_epi32(reinterpret_cast<const int*>(light_fnc.lookup_u32.data()), (__m256i) x, 4);
 
-        pixel = uv_pixel != 0 ? rgba_multiply_scalar(pixel, x) : pixel;
+        pixel = (uv_pixel & alpha_mask) != 0 ? rgba_multiply_scalar(pixel, x) : pixel;
 
 #ifndef NDEBUG
         //call the scalar function on this block of 8 values and check that the result matches
@@ -270,7 +271,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 }
 #endif
 
-void blockImageMultiply(RGBAImage &block, NormalizedUInt8 factor) {
+AUTO_TARGET_CLONES void blockImageMultiplyScalar(RGBAImage &block, NormalizedUInt8 factor) {
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
@@ -296,12 +297,32 @@ AUTO_TARGET_CLONES void blockImageTint(RGBAImage &block, const RGBAImage &mask, 
 		});
 }
 
-void blockImageTint(RGBAImage &block, RGBAPixel color) {
+AUTO_TARGET_CLONES void blockImageMultiplyInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color) {
+	assert(dst.isSameSize(src));
+
+	std::transform(
+		src.begin(), src.end(), dst.begin(),
+		[color](RGBAPixel pixel) -> RGBAPixel {
+			return rgba_multiply(pixel, color);
+		});
+}
+
+AUTO_TARGET_CLONES void blockImageMultiplyWithAlphaInto(RGBAImage& dst, const RGBAImage& src, RGBAPixel color) {
+	assert(dst.isSameSize(src));
+
+	std::transform(
+		src.begin(), src.end(), dst.begin(),
+		[color](RGBAPixel pixel) -> RGBAPixel {
+			return rgba_multiply_with_alpha(pixel, color);
+		});
+}
+
+AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color) {
 	//trivially vectorizable loop
 	std::transform(
 		block.begin(), block.end(), block.begin(),
 		[color](RGBAPixel pixel) -> RGBAPixel {
-			return rgba_alpha(pixel) ? rgba_multiply(pixel, color) : pixel;
+			return rgba_multiply(pixel, color);
 		});
 }
 
@@ -326,7 +347,7 @@ static std::array<int, 4> blockImageTintHighContrastAmount(RGBAPixel color) {
 	return { nr, ng, nb, 0 };
 }
 
-void blockImageTintHighContrast(RGBAImage &block, RGBAPixel color) {
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage &block, RGBAPixel color) {
 	auto tint = blockImageTintHighContrastAmount(color);
 
 	//trivially vectorizable loop
@@ -339,7 +360,7 @@ void blockImageTintHighContrast(RGBAImage &block, RGBAPixel color) {
 		});
 }
 
-void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color) {
+AUTO_TARGET_CLONES void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceIndex face, RGBAPixel color) {
 	assert(block.isSameSize(mask));
 	auto tint = blockImageTintHighContrastAmount(color);
 
@@ -347,14 +368,57 @@ void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, FaceInd
 	std::transform(
 		block.begin(), block.end(), mask.begin(), block.begin(),
 		[face, tint](RGBAPixel pixel, RGBAPixel mask_pixel) -> RGBAPixel {
-			return rgba_blue(mask_pixel) == face
+			return rgba_alpha(mask_pixel) && rgba_blue(mask_pixel) == face
 				       ? rgba_add_clamp(pixel, tint)
 				       : pixel;
 		});
 }
 
+AUTO_TARGET_CLONES void blockImageStripSidesInto(RGBAImage& dst, const RGBAImage& src, const RGBAImage& uv_mask, bool strip_up, bool strip_left, bool strip_right) {
+	assert(dst.isSameSize(block));
+	assert(dst.isSameSize(uv_mask));
+
+	/*for (int i=0; i<tile_image.image.width*tile_image.image.height; i++) {
+		RGBAPixel puv = uv_image.data[i];
+		RGBAPixel p = image.data[i];
+		switch(rgba_blue(puv)) {
+			case FACE_UP_INDEX:
+				if (strip_up) {
+					p = 0;
+				}
+				break;
+			case FACE_LEFT_INDEX:
+				if (strip_left) {
+					p = 0;
+				}
+				break;
+			case FACE_RIGHT_INDEX:
+				if (strip_right) {
+					p = 0;
+				}
+				break;
+		}
+		tile_image.image.data[i] = p;
+	}*/
+
+	uint8_t flags = 0;
+	if (strip_up) flags |= 1 << FACE_UP_INDEX;
+	if (strip_left) flags |= 1 << FACE_LEFT_INDEX;
+	if (strip_right) flags |= 1 << FACE_RIGHT_INDEX;
+
+	std::transform(
+		src.begin(), src.end(), uv_mask.begin(), dst.begin(),
+		[flags](RGBAPixel src_pixel, RGBAPixel uv_pixel) -> RGBAPixel {
+			//if the mask pixel at this position is valid and indicates one of the faces being stripped,
+			//set the pixel to 0.
+			return rgba_alpha(uv_pixel) != 0 && (flags & (1 << rgba_blue(uv_pixel))) != 0
+				       ? 0
+				       : src_pixel;
+		});
+}
+
 void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
-		const RGBAImage& top, const RGBAImage& top_uv_mask) {
+                              const RGBAImage& top, const RGBAImage& top_uv_mask) {
 	assert(block.isSameSize(uv_mask));
 	assert(block.isSameSize(top));
 	assert(block.isSameSize(top_uv_mask));
@@ -435,7 +499,7 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 	}
 }
 
-bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
+AUTO_TARGET_CLONES bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
 	assert(block.isSameSize(uv_mask));
 
 	auto block_it = block.begin();
@@ -461,7 +525,7 @@ bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
 	return result != 0;
 }
 
-std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv) {
+AUTO_TARGET_CLONES std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv) {
 	//first, reduce the side mask into a bitfield (this can be vectorized).
 	//  this works because FACE_[LEFT|RIGHT|UP]_INDEX are 0/1/2 respectively, so we only have to do a quick shift.
 	int side_mask_bits = 0;
@@ -624,7 +688,6 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 
 		//std::cout << block_name << " " << variant << std::endl;
 	}
-	in.close();
 
     for (uint32_t image_uv_index : all_image_uv_indices) {
         const RGBAImage& image = BlockAtlas::instance().GetImage(image_uv_index);
