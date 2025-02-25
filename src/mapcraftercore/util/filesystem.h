@@ -20,6 +20,8 @@
 #ifndef FILESYSTEM_H_
 #define FILESYSTEM_H_
 
+#include <fstream>
+#include <string>
 #include <vector>
 #include <boost/filesystem.hpp>
 
@@ -28,7 +30,73 @@ namespace fs = boost::filesystem;
 namespace mapcrafter {
 namespace util {
 
-bool moveFile(const fs::path& from, const fs::path& to);
+/**
+ * Opens a binary file for reading.
+ *
+ * The returned stream will throw @c std::exception if an error occurs.
+ *
+ * @param path the file path
+ * @return a @c std::ifstream for reading from the file
+ * @throws std::exception if the operation fails
+ */
+std::ifstream openBinaryFileForRead(const fs::path& path);
+
+/**
+ * Opens a binary file for writing. If the file exists, it will be truncated.
+ *
+ * The returned stream will throw @c std::exception if an error occurs.
+ *
+ * @param path the file path
+ * @return a @c std::ofstream for writing to the file
+ * @throws std::exception if the operation fails
+ */
+std::ofstream openBinaryFileForWrite(const fs::path& path);
+
+/**
+ * Reads the binary contents of the given file.
+ *
+ * @param path the file path
+ * @return the file data
+ * @throws std::exception if the operation fails
+ */
+std::string readEntireFileToString(const fs::path& path);
+
+/**
+ * Reads the binary contents of the given file.
+ *
+ * @param path the file path
+ * @return the file data
+ * @throws std::exception if the operation fails
+ */
+std::vector<uint8_t> readEntireFileToVector(const fs::path& path);
+
+/**
+ * Writes the given data to the given file. If the file exists, its contents will be overwritten.
+ *
+ * @param path the file path
+ * @param data the data to write
+ * @throws std::exception if the operation fails
+ */
+void writeEntireFile(const fs::path& path, const std::string& data);
+
+/**
+ * Writes the given data to the given file. If the file exists, its contents will be overwritten.
+ *
+ * @param path the file path
+ * @param data the data to write
+ * @throws std::exception if the operation fails
+ */
+void writeEntireFile(const fs::path& path, const std::vector<uint8_t>& data);
+
+/**
+ * Writes the given data to the given file. If the file exists, its contents will be overwritten.
+ *
+ * @param path the file path
+ * @param data the data to write
+ * @param size the number of bytes to write
+ * @throws std::exception if the operation fails
+ */
+void writeEntireFile(const fs::path& path, const void* data, size_t size);
 
 /**
  * Returns the home directory of the current user.

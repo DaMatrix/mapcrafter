@@ -35,11 +35,44 @@
 namespace mapcrafter {
 namespace util {
 
-bool moveFile(const fs::path& from, const fs::path& to) {
-	if (!fs::exists(from) || (fs::exists(to) && !fs::remove(to)))
-		return false;
-	fs::rename(from, to);
-	return true;
+std::ifstream openBinaryFileForRead(const fs::path& path) {
+	std::ifstream result;
+	result.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+	result.open(path.string(), std::ios_base::binary);
+	return result;
+}
+
+std::ofstream openBinaryFileForWrite(const fs::path& path) {
+	std::ofstream result;
+	result.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	result.open(path.string(), std::ios_base::binary);
+	return result;
+}
+
+std::string readEntireFileToString(const fs::path& path) {
+	size_t size = fs::file_size(path);
+	std::string result(size, '\0');
+	openBinaryFileForRead(path).read(&result[0], size);
+	return result;
+}
+
+std::vector<uint8_t> readEntireFileToVector(const fs::path& path) {
+	size_t size = fs::file_size(path);
+	std::vector<uint8_t> result(size);
+	openBinaryFileForRead(path).read(reinterpret_cast<char*>(result.data()), size);
+	return result;
+}
+
+void writeEntireFile(const fs::path& path, const std::string& data) {
+	writeEntireFile(path, data.data(), data.size());
+}
+
+void writeEntireFile(const fs::path& path, const std::vector<uint8_t>& data) {
+	writeEntireFile(path, data.data(), data.size());
+}
+
+void writeEntireFile(const fs::path& path, const void* data, size_t size) {
+	openBinaryFileForWrite(path).write(static_cast<const char*>(data), size);
 }
 
 fs::path findHomeDir() {

@@ -245,8 +245,7 @@ void RGBAImage::readPNG(const std::string& filename) {
 			throw std::runtime_error(std::string("failed to decode png image: ") + spng_strerror(err));
 		};
 
-		std::string file;
-		boost::filesystem::load_string_file(filename, file);
+		std::vector<uint8_t> file = util::readEntireFileToVector(filename);
 
 		//prepare the context
 		spng_ctx_wrapper ctx(0);
@@ -388,7 +387,7 @@ void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 			return fail(err);
 
 		//save the result to a file
-		boost::filesystem::save_string_file(filename, std::string(static_cast<char *>(png_buf.get()), png_size));
+		util::writeEntireFile(filename, png_buf.get(), png_size);
 		return;
 	#else
 	auto fail = [] { throw std::runtime_error("failed to encode png image"); };
@@ -430,7 +429,7 @@ void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 	png_destroy_write_struct(&png, &info);
 
 	//this will throw an exception if it fails
-	boost::filesystem::save_string_file(filename, file_data);
+	util::writeEntireFile(filename, file_data);
 	return;
 #endif
 }
@@ -553,7 +552,7 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, const WritePngOptio
 	png_destroy_write_struct(&png, &info);
 
 	//this will throw an exception if it fails
-	boost::filesystem::save_string_file(filename, file_data);
+	util::writeEntireFile(filename, file_data);
 	return true;
 }
 

@@ -441,13 +441,12 @@ const std::vector<std::pair<std::string, std::set<RenderRotation::Direction> > >
 
 void RenderManager::copyTemplateFile(const std::string& filename,
 		const std::map<std::string, std::string>& vars) const {
-	std::string data;
-	fs::load_string_file(config.getTemplatePath(filename), data);
+	std::string data = util::readEntireFileToString(config.getTemplatePath(filename));
 
 	for (auto& var : vars)
 		data = util::replaceAll(data, "{" + var.first + "}", var.second);
 
-	fs::save_string_file(config.getOutputPath(filename), data);
+	util::writeEntireFile(config.getOutputPath(filename), data);
 }
 
 void RenderManager::writeTemplateIndexHtml() const {
@@ -538,37 +537,37 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 
 	if (fs::exists(dir / "1")) {
 		// at first rename the directories 1 2 3 4 (zoom level 0) and make new directories
-		util::moveFile(dir / "1", dir / "1_");
+		fs::rename(dir / "1", dir / "1_");
 		fs::create_directories(dir / "1");
 		// then move the old tile trees one zoom level deeper
-		util::moveFile(dir / "1_", dir / "1/4");
+		fs::rename(dir / "1_", dir / "1/4");
 		// also move the images of the directories
-		util::moveFile(dir / (std::string("1.") + map_config.getImageFormatSuffix()),
+		fs::rename(dir / (std::string("1.") + map_config.getImageFormatSuffix()),
 				dir / (std::string("1/4.") + map_config.getImageFormatSuffix()));
 	}
 
 	// do the same for the other directories
 	if (fs::exists(dir / "2")) {
-		util::moveFile(dir / "2", dir / "2_");
+		fs::rename(dir / "2", dir / "2_");
 		fs::create_directories(dir / "2");
-		util::moveFile(dir / "2_", dir / "2/3");
-		util::moveFile(dir / (std::string("2.") + map_config.getImageFormatSuffix()),
+		fs::rename(dir / "2_", dir / "2/3");
+		fs::rename(dir / (std::string("2.") + map_config.getImageFormatSuffix()),
 				dir / (std::string("2/3.") + map_config.getImageFormatSuffix()));
 	}
 
 	if (fs::exists(dir / "3")) {
-		util::moveFile(dir / "3", dir / "3_");
+		fs::rename(dir / "3", dir / "3_");
 		fs::create_directories(dir / "3");
-		util::moveFile(dir / "3_", dir / "3/2");
-		util::moveFile(dir / (std::string("3.") + map_config.getImageFormatSuffix()),
+		fs::rename(dir / "3_", dir / "3/2");
+		fs::rename(dir / (std::string("3.") + map_config.getImageFormatSuffix()),
 				dir / (std::string("3/2.") + map_config.getImageFormatSuffix()));
 	}
 
 	if (fs::exists(dir / "4")) {
-		util::moveFile(dir / "4", dir / "4_");
+		fs::rename(dir / "4", dir / "4_");
 		fs::create_directories(dir / "4");
-		util::moveFile(dir / "4_", dir / "4/1");
-		util::moveFile(dir / (std::string("4.") + map_config.getImageFormatSuffix()),
+		fs::rename(dir / "4_", dir / "4/1");
+		fs::rename(dir / (std::string("4.") + map_config.getImageFormatSuffix()),
 				dir / (std::string("4/1.") + map_config.getImageFormatSuffix()));
 	}
 

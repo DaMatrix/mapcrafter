@@ -54,12 +54,12 @@ bool WebConfig::readConfigJS() {
 	// try to read config.js file or migrate old map.settings files
 	if (fs::is_regular_file(config.getOutputPath("config.js"))) {
 		// TODO check if map/world configuration has changed?
-		static auto try_again = "Please fix the problem in the config.js file "
+		static const char try_again[] = "Please fix the problem in the config.js file "
 			"or delete the corrupt file (Warning: You will have to render your maps again).";
 
 		std::string config_data;
 		try {
-			fs::load_string_file(config.getOutputPath("config.js"), config_data);
+			config_data = util::readEntireFileToString(config.getOutputPath("config.js"));
 		} catch (...) {
 			LOG(FATAL) << "Unable to open config.js file!";
 			LOG(FATAL) << try_again;
@@ -72,10 +72,9 @@ bool WebConfig::readConfigJS() {
 			return false;
 		}
 
-		config_data = config_data.substr(std::string("var CONFIG = ").size());
 		picojson::value value;
 		std::string json_error;
-		picojson::parse(value, config_data.begin(), config_data.end(), &json_error);
+		picojson::parse(value, config_data.begin() + std::string("var CONFIG = ").size(), config_data.end(), &json_error);
 		if (!json_error.empty()) {
 			LOG(FATAL) << "Unable to parse json in config.js file: " << json_error;
 			LOG(FATAL) << try_again;
@@ -154,7 +153,7 @@ bool WebConfig::readConfigJS() {
 
 void WebConfig::writeConfigJS() const {
 	// TODO write world/map config to check if it was changed next time we read config.js?
-	fs::save_string_file(
+	util::writeEntireFile(
 		config.getOutputPath("config.js"),
 		"var CONFIG = " + util::trim(getConfigJSON().serialize(true)) + ';');
 }
