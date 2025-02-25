@@ -33,10 +33,10 @@ BlockAtlas* BlockAtlas::instance_ptr = NULL;
  * all the necessary graphic blocks to
  * render all tiles.
  */
-bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
+bool BlockAtlas::OpenDictionary(const fs::path& path, const std::string& name) {
 	this->block_count = 0;
 	this->block_ptrs.clear();
-	this->shaded_blocks.clear();
+	this->shaded_blocks.reset();
 
 	fs::path info_file  = path / (name + ".txt");
 	fs::path block_file = path / (name + ".png");
@@ -92,7 +92,7 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 	}
 	this->block_count = blocks_x * blocks_y;
 	this->block_ptrs.reserve(this->block_count);
-	this->shaded_blocks.reserve(this->block_count);
+	assert(this->block_count <= this->shaded_blocks.size());
 	uint32_t x = 0, y = 0;
 	while (y <= blocks_y) {
 		std::shared_ptr<RGBAImage> ptr = std::make_shared<RGBAImage>();
@@ -108,29 +108,25 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 }
 
 const RGBAImage& BlockAtlas::GetImage(uint32_t idx) {
-	if (idx >= this->block_count) {
-		throw std::runtime_error("Block atlas doesn't match image index file");
-	}
-	return *this->block_ptrs[idx];
+	return *this->block_ptrs.at(idx);
 }
 
 void BlockAtlas::ShadeBlock(int idx, int uv_idx, float factor_left, float factor_right, float factor_up) {
-	if (this->shaded_blocks.find(idx) != this->shaded_blocks.end()) {
+	if (this->shaded_blocks.test(idx)) {
 		return;
 	}
-	shaded_blocks.insert(idx);
+	shaded_blocks.set(idx);
 
 	RGBAImage&       block   = *this->block_ptrs[idx];
 	const RGBAImage& uv_mask = *this->block_ptrs[uv_idx];
 
 	assert(block.isSameSize(uv_mask));
 
-	for (size_t x = 0; x < block.getWidth(); x++) {
-		for (size_t y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel    = block.pixel(x, y);
-			uint32_t  uv_pixel = uv_mask.pixel(x, y);
+	std::transform(
+		block.begin(), block.end(), uv_mask.begin(), block.begin(),
+		[factor_left, factor_right, factor_up](RGBAPixel pixel, RGBAPixel uv_pixel) -> RGBAPixel {
 			if (rgba_alpha(uv_pixel) == 0) {
-				continue;
+				return pixel;
 			}
 
 			uint8_t side = rgba_blue(uv_pixel);
@@ -143,8 +139,8 @@ void BlockAtlas::ShadeBlock(int idx, int uv_idx, float factor_left, float factor
 			if (side == FACE_UP_INDEX) {
 				pixel = rgba_multiply(pixel, factor_up, factor_up, factor_up);
 			}
-		}
-	}
+			return pixel;
+		});
 }
 
 }  // namespace renderer

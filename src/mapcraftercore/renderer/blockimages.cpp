@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <chrono>
 #include <map>
+#include <unordered_set>
 #include <vector>
 
 namespace mapcrafter {
@@ -499,7 +500,7 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 
 	std::string name = view + "_" + util::str(rotation) + "_" + util::str(texture_size);
 
-	BlockAtlas::instance().OpenDictionnary(path,name);
+	BlockAtlas::instance().OpenDictionary(path,name);
 
 	fs::path info_file = path / (name + ".txt");
 

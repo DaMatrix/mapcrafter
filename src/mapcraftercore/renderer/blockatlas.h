@@ -22,8 +22,9 @@
 
 #include <boost/filesystem.hpp>
 #include <cstdint>
+#include <bitset>
+#include <limits>
 #include <memory>
-#include <unordered_set>
 
 namespace fs = boost::filesystem;
 
@@ -61,7 +62,7 @@ class BlockAtlas {
 		return *BlockAtlas::instance_ptr;
 	}
 
-	bool OpenDictionnary(fs::path path, std::string block_file);
+	bool OpenDictionary(const fs::path& path, const std::string& block_file);
 
 	uint32_t const                         GetCount() { return this->block_count; };
 	const RGBAImage& GetImage(uint32_t idx);
@@ -74,7 +75,7 @@ class BlockAtlas {
   private:
 	std::vector<std::shared_ptr<RGBAImage> > block_ptrs;
 	std::shared_ptr<RGBAImage>               unknown_block;
-	std::unordered_set<uint16_t>             shaded_blocks;
+	std::bitset<std::numeric_limits<uint16_t>::max()> shaded_blocks;
 	uint32_t                                 block_count;
 	uint32_t                                 block_width;
 	uint32_t                                 block_height;
