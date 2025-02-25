@@ -185,14 +185,7 @@ AUTO_TARGET_CLONES RGBAImage RGBAImage::resizeHalf() const {
 		const RGBAPixel* src_it0 = src_it;
 		const RGBAPixel* src_it1 = src_it + src_width;
 		for (size_t col = 0; col < dst_width; col++) {
-			RGBAPixel p1 = src_it0[0];
-			RGBAPixel p2 = src_it0[1];
-			RGBAPixel p3 = src_it1[0];
-			RGBAPixel p4 = src_it1[1];
-
-			RGBAPixel highBits = ((p1 >> 2) & 0x3f3f3f3f) + ((p2 >> 2) & 0x3f3f3f3f) + ((p3 >> 2) & 0x3f3f3f3f) + ((p4 >> 2) & 0x3f3f3f3f);
-			RGBAPixel lowBits = (((p1 & 0x03030303) + (p2 & 0x03030303) + (p3 & 0x03030303) + (p4 & 0x03030303)) >> 2) & 0x03030303;
-			*dst_it = highBits + lowBits;
+			*dst_it = rgba_average_with_alpha(src_it0[0], src_it0[1], src_it1[0], src_it1[1]);
 
 			src_it0 += 2;
 			src_it1 += 2;

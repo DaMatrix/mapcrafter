@@ -76,14 +76,6 @@ struct NormalizedUInt8 {
 	}
 };
 
-inline NormalizedUInt8 addSaturating(const NormalizedUInt8& lhs, const NormalizedUInt8& rhs) {
-	uint8_t result = lhs.value + rhs.value;
-	if (result < lhs.value) { //the value overflowed!
-		result = 0xFF;
-	}
-	return NormalizedUInt8(result);
-}
-
 inline NormalizedUInt8 multiply(const NormalizedUInt8& lhs, const NormalizedUInt8& rhs) {
 	//approximately equal to:
 	//  uint8_t result = ((double) lhs.value / 255.0) * ((double) rhs.value / 255.0) * 255.0;
@@ -125,6 +117,12 @@ inline RGBAPixel rgba_average(RGBAPixel v1, RGBAPixel v2) {
 	RGBAPixel v2_masked = v2 & 0x00FEFEFE;
 	RGBAPixel sum = (v1_masked + v2_masked) >> 1;
 	return (v1 & 0xff000000) | sum;
+}
+
+inline RGBAPixel rgba_average_with_alpha(RGBAPixel p1, RGBAPixel p2, RGBAPixel p3, RGBAPixel p4) {
+	RGBAPixel highBits = ((p1 >> 2) & 0X3F3F3F3F) + ((p2 >> 2) & 0X3F3F3F3F) + ((p3 >> 2) & 0X3F3F3F3F) + ((p4 >> 2) & 0X3F3F3F3F);
+	RGBAPixel lowBits = (((p1 & 0x03030303) + (p2 & 0x03030303) + (p3 & 0x03030303) + (p4 & 0x03030303)) >> 2) & 0x03030303;
+	return highBits + lowBits;
 }
 
 inline RGBAPixel rgba_multiply(RGBAPixel v1, RGBAPixel v2) {
