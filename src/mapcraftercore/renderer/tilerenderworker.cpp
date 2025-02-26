@@ -142,19 +142,19 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 		RGBAImage other;
 		if (render_context.tile_set->hasTile(tile + 1)) {
 			renderRecursive(tile + 1, other);
-			image.simpleAlphaBlit(std::move(other).resizeHalf(), 0, 0);
+			image.simpleAlphaBlit(other.resizeHalf(), 0, 0);
 		}
 		if (render_context.tile_set->hasTile(tile + 2)) {
 			renderRecursive(tile + 2, other);
-			image.simpleAlphaBlit(std::move(other).resizeHalf(), w / 2, 0);
+			image.simpleAlphaBlit(other.resizeHalf(), w / 2, 0);
 		}
 		if (render_context.tile_set->hasTile(tile + 3)) {
 			renderRecursive(tile + 3, other);
-			image.simpleAlphaBlit(std::move(other).resizeHalf(), 0, h / 2);
+			image.simpleAlphaBlit(other.resizeHalf(), 0, h / 2);
 		}
 		if (render_context.tile_set->hasTile(tile + 4)) {
 			renderRecursive(tile + 4, other);
-			image.simpleAlphaBlit(std::move(other).resizeHalf(), w / 2, h / 2);
+			image.simpleAlphaBlit(other.resizeHalf(), w / 2, h / 2);
 		}
 
 		/*

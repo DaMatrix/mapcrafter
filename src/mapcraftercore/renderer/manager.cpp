@@ -594,7 +594,7 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 
 	// resize the old images...
 	for (RGBAImage& img : imgs)
-		img = std::move(img).resizeHalf();
+		img = img.resizeHalf();
 
 	// ...to blit them to the images of the new directories
 	news[0].simpleBlit(imgs[0], w / 2, h / 2);
@@ -622,7 +622,7 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 	};
 	for (size_t i = 0; i < 4; i++)
 		base.simpleAlphaBlit(news[i], baseOffsets[i].first, baseOffsets[i].second);
-	base = std::move(base).resizeHalf();
+	base = base.resizeHalf();
 
 	map_config.saveImage(base, dir / (std::string("base.") + map_config.getImageFormatSuffix()), background_color);
 }

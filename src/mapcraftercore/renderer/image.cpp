@@ -25,7 +25,6 @@
 
 #include "image/dithering.h"
 #include "image/quantization.h"
-#include "image/scaling.h"
 #include "../util.h"
 
 #include <jpeglib.h>
@@ -207,10 +206,55 @@ RGBAImage RGBAImage::clip(size_t x, size_t y, size_t w, size_t h) const {
 	return image;
 }
 
-RGBAImage RGBAImage::resizeHalf() const & {
-	RGBAImage result;
-	imageResizeHalf(*this, result);
-	return result;
+AUTO_TARGET_CLONES RGBAImage RGBAImage::resizeHalf() const {
+	size_t src_width = this->width;
+	size_t src_height = this->height;
+	assert(src_width % 2 == 0 && src_height % 2 == 0 && "image size must be divisible by two!");
+
+	size_t dst_width = src_width / 2;
+	size_t dst_height = src_height / 2;
+	RGBAImage dst(dst_width, dst_height, util::UninitializedTag{});
+
+	/*for (size_t x = 0; x < src_width - 1; x += 2) {
+		for (size_t y = 0; y < src_height - 1; y += 2) {
+			RGBAPixel p1 = this->pixel(x, y);
+			RGBAPixel p2 = this->pixel(x + 1, y);
+			RGBAPixel p3 = this->pixel(x, y + 1);
+			RGBAPixel p4 = this->pixel(x + 1, y + 1);
+			RGBAPixel highBits = ((p1 >> 2) & 0x3f3f3f3f) + ((p2 >> 2) & 0x3f3f3f3f) + ((p3 >> 2) & 0x3f3f3f3f) + ((p4 >> 2) & 0x3f3f3f3f);
+			RGBAPixel lowBits = (((p1 & 0x03030303) + (p2 & 0x03030303) + (p3 & 0x03030303) + (p4 & 0x03030303)) >> 2) & 0x03030303;
+			dst.pixel(x >> 1, y >> 1) = highBits + lowBits;
+		}
+	}*/
+
+	const RGBAPixel* src_it = begin();
+	RGBAPixel* dst_it = dst.begin();
+	for (size_t row = 0; row < dst_height; row++) {
+		// For each row: iterate along two rows in the source image at once, reading two pixels from each (for a total
+		// of four pixels at a time), averaging them out and writing a single pixel into the destination image.
+		// This loop is simple enough to be autovectorized by both GCC and clang.
+
+		const RGBAPixel* src_it0 = src_it;
+		const RGBAPixel* src_it1 = src_it + src_width;
+		for (size_t col = 0; col < dst_width; col++) {
+			RGBAPixel p1 = src_it0[0];
+			RGBAPixel p2 = src_it0[1];
+			RGBAPixel p3 = src_it1[0];
+			RGBAPixel p4 = src_it1[1];
+
+			RGBAPixel highBits = ((p1 >> 2) & 0x3f3f3f3f) + ((p2 >> 2) & 0x3f3f3f3f) + ((p3 >> 2) & 0x3f3f3f3f) + ((p4 >> 2) & 0x3f3f3f3f);
+			RGBAPixel lowBits = (((p1 & 0x03030303) + (p2 & 0x03030303) + (p3 & 0x03030303) + (p4 & 0x03030303)) >> 2) & 0x03030303;
+			*dst_it = highBits + lowBits;
+
+			src_it0 += 2;
+			src_it1 += 2;
+			dst_it++;
+		}
+
+		src_it += src_width * 2;
+	}
+
+	return dst;
 }
 
 #if HAVE_SPNG_LIBRARY

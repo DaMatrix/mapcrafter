@@ -312,8 +312,7 @@ public:
 
 	RGBAImage clip(size_t x, size_t y, size_t w, size_t h) const;
 
-	RGBAImage resizeHalf() const &;
-	RGBAImage resizeHalf() && { return resizeHalf(); };
+	AUTO_TARGET_CLONES RGBAImage resizeHalf() const;
 
 	//these functions may throw an std::exception or return false to indicate failure
 	void readPNG(const std::string& filename);
