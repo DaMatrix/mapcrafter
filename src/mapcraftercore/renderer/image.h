@@ -282,17 +282,6 @@ protected:
 	bool containsRect(size_t x, size_t y, size_t w, size_t h) const;
 };
 
-enum class InterpolationType {
-	// nearest-neighbor interpolation, simple one
-	NEAREST,
-	// bilinear interpolation, fancy one
-	BILINEAR,
-	// special interpolation tweaked for resizing to (width/2, height/2)
-	HALF,
-	// automatically choose an interpolation type
-	AUTO
-};
-
 struct WritePngOptions {
 	int compression_level = -1;
 };
@@ -323,13 +312,8 @@ public:
 
 	RGBAImage clip(size_t x, size_t y, size_t w, size_t h) const;
 
-	void resize(RGBAImage& dest, size_t width, size_t height,
-			InterpolationType interpolation = InterpolationType::AUTO) const;
-
-	RGBAImage resize(size_t width, size_t height,
-			InterpolationType interpolation = InterpolationType::AUTO) const;
-
-	RGBAImage resizeHalf() const;
+	RGBAImage resizeHalf() const &;
+	RGBAImage resizeHalf() && { return resizeHalf(); };
 
 	//these functions may throw an std::exception or return false to indicate failure
 	void readPNG(const std::string& filename);

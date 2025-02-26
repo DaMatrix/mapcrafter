@@ -29,8 +29,6 @@ namespace renderer {
 
 class RGBAImage;
 
-void imageResizeSimple(const RGBAImage& image, RGBAImage& dest, size_t width, size_t height);
-void imageResizeBilinear(const RGBAImage& image, RGBAImage& dest, size_t width, size_t height);
 AUTO_TARGET_CLONES void imageResizeHalf(const RGBAImage& image, RGBAImage& dst);
 
 }

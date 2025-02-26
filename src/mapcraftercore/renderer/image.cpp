@@ -207,40 +207,7 @@ RGBAImage RGBAImage::clip(size_t x, size_t y, size_t w, size_t h) const {
 	return image;
 }
 
-void RGBAImage::resize(RGBAImage& dest, size_t width, size_t height, InterpolationType interpolation) const {
-	if (width == getWidth() && height == getHeight()) {
-		dest = *this;
-		return;
-	}
-	if (interpolation == InterpolationType::AUTO) {
-		interpolation = InterpolationType::BILINEAR;
-		if (width > getWidth() || height > getWidth())
-			interpolation = InterpolationType::NEAREST;
-		if (width == getWidth() / 2 && height == getHeight() / 2)
-			interpolation = InterpolationType::HALF;
-	}
-
-	if (interpolation == InterpolationType::NEAREST) {
-		imageResizeSimple(*this, dest, width, height);
-	} else if (interpolation == InterpolationType::BILINEAR) {
-		imageResizeBilinear(*this, dest, width, height);
-	} else if (interpolation == InterpolationType::HALF) {
-		imageResizeHalf(*this, dest);
-	} else {
-		// should not happen
-		assert(false);
-	}
-}
-
-RGBAImage RGBAImage::resize(size_t width, size_t height, InterpolationType interpolation) const {
-	if (width == getWidth() && height == getHeight())
-		return *this;
-	RGBAImage temp;
-	resize(temp, width, height, interpolation);
-	return temp;
-}
-
-RGBAImage RGBAImage::resizeHalf() const {
+RGBAImage RGBAImage::resizeHalf() const & {
 	RGBAImage result;
 	imageResizeHalf(*this, result);
 	return result;

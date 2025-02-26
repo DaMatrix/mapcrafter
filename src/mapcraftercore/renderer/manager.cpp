@@ -590,18 +590,17 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 
 	// create images for the new directories
 	std::array<RGBAImage, 4> news{};
-	std::generate(news.begin(), news.end(), [=] { return RGBAImage(w, h); });
+	std::generate(news.begin(), news.end(), [w, h] { return RGBAImage(w, h); });
 
 	// resize the old images...
-	std::array<RGBAImage, 4> olds{};
-	for (size_t i = 0; i < 4; i++)
-		imgs[i].resize(olds[i], 0, 0, InterpolationType::HALF);
+	for (RGBAImage& img : imgs)
+		img = std::move(img).resizeHalf();
 
 	// ...to blit them to the images of the new directories
-	news[0].simpleAlphaBlit(olds[0], w/2, h/2);
-	news[1].simpleAlphaBlit(olds[1], 0, h/2);
-	news[2].simpleAlphaBlit(olds[2], w/2, 0);
-	news[3].simpleAlphaBlit(olds[3], 0, 0);
+	news[0].simpleBlit(imgs[0], w / 2, h / 2);
+	news[1].simpleBlit(imgs[1], 0, h / 2);
+	news[2].simpleBlit(imgs[2], w / 2, 0);
+	news[3].simpleBlit(imgs[3], 0, 0);
 
 	// now save the new images in the output directory
 	std::array<const char*, 4> NEW_PATHS = {
@@ -623,7 +622,7 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 	};
 	for (size_t i = 0; i < 4; i++)
 		base.simpleAlphaBlit(news[i], baseOffsets[i].first, baseOffsets[i].second);
-	base = base.resize(0, 0, InterpolationType::HALF);
+	base = std::move(base).resizeHalf();
 
 	map_config.saveImage(base, dir / (std::string("base.") + map_config.getImageFormatSuffix()), background_color);
 }

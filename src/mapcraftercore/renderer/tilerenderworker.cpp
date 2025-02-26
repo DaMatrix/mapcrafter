@@ -135,34 +135,26 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 		// and blit it to the properly position
 		//int size = render_context.map_config.getTextureSize() * 32 * TILE_WIDTH;
 		// TODO
-		int w = render_context.tile_renderer->getTileWidth();
-		int h = render_context.tile_renderer->getTileHeight();
+		auto w = render_context.tile_renderer->getTileWidth();
+		auto h = render_context.tile_renderer->getTileHeight();
 		image.setSize(w, h);
 
 		RGBAImage other;
-		RGBAImage resized;
 		if (render_context.tile_set->hasTile(tile + 1)) {
 			renderRecursive(tile + 1, other);
-			other.resize(resized, 0, 0, InterpolationType::HALF);
-			image.simpleAlphaBlit(resized, 0, 0);
-			other.clear();
+			image.simpleAlphaBlit(std::move(other).resizeHalf(), 0, 0);
 		}
 		if (render_context.tile_set->hasTile(tile + 2)) {
 			renderRecursive(tile + 2, other);
-			other.resize(resized, 0, 0, InterpolationType::HALF);
-			image.simpleAlphaBlit(resized, w / 2, 0);
-			other.clear();
+			image.simpleAlphaBlit(std::move(other).resizeHalf(), w / 2, 0);
 		}
 		if (render_context.tile_set->hasTile(tile + 3)) {
 			renderRecursive(tile + 3, other);
-			other.resize(resized, 0, 0, InterpolationType::HALF);
-			image.simpleAlphaBlit(resized, 0, h / 2);
-			other.clear();
+			image.simpleAlphaBlit(std::move(other).resizeHalf(), 0, h / 2);
 		}
 		if (render_context.tile_set->hasTile(tile + 4)) {
 			renderRecursive(tile + 4, other);
-			other.resize(resized, 0, 0, InterpolationType::HALF);
-			image.simpleAlphaBlit(resized, w / 2, h / 2);
+			image.simpleAlphaBlit(std::move(other).resizeHalf(), w / 2, h / 2);
 		}
 
 		/*
