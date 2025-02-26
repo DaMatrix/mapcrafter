@@ -142,6 +142,8 @@ private:
 	T value;
 };
 
+struct UninitializedTag {};
+
 } /* namespace util */
 } /* namespace mapcrafter */
 #endif /* OTHER_H_ */

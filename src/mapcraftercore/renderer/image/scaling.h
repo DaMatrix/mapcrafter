@@ -20,14 +20,18 @@
 #ifndef IMAGE_SCALING_H_
 #define IMAGE_SCALING_H_
 
+#include "../../config.h" //AUTO_TARGET_CLONES
+
+#include <cstddef>
+
 namespace mapcrafter {
 namespace renderer {
 
 class RGBAImage;
 
-void imageResizeSimple(const RGBAImage& image, RGBAImage& dest, int width, int height);
-void imageResizeBilinear(const RGBAImage& image, RGBAImage& dest, int width, int height);
-void imageResizeHalf(const RGBAImage& image, RGBAImage& dest);
+void imageResizeSimple(const RGBAImage& image, RGBAImage& dest, size_t width, size_t height);
+void imageResizeBilinear(const RGBAImage& image, RGBAImage& dest, size_t width, size_t height);
+AUTO_TARGET_CLONES void imageResizeHalf(const RGBAImage& image, RGBAImage& dst);
 
 }
 }

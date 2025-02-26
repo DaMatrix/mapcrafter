@@ -340,15 +340,12 @@ void octreeColorQuantize(const RGBAImage& image, size_t max_colors,
 	std::priority_queue<Octree*, std::vector<Octree*>, NodeComparator> queue;
 
 	// insert the colors into the octree
-	for (int x = 0; x < image.getWidth(); x++) {
-		for (int y = 0; y < image.getHeight(); y++) {
-			RGBAPixel color = image.pixel(x, y);
-			Octree* node = Octree::findOrCreateNode(internal_octree, color);
-			node->setColor(color);
-			// add the leaf only once to the queue
-			if (node->getCount() == 1)
-				queue.push(node);
-		}
+	for (RGBAPixel color : image) {
+		Octree* node = Octree::findOrCreateNode(internal_octree, color);
+		node->setColor(color);
+		// add the leaf only once to the queue
+		if (node->getCount() == 1)
+			queue.push(node);
 	}
 
 	// now: reduce the leaves until we have less colors than maximum

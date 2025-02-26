@@ -533,8 +533,8 @@ void RenderManager::increaseMaxZoom(const fs::path& dir, const config::MapSectio
 	// find out tile size by reading old base.png image
 	RGBAImage old_base;
 	map_config.loadImage(old_base, dir / (std::string("base.") + map_config.getImageFormatSuffix()));
-	int w = old_base.getWidth();
-	int h = old_base.getHeight();
+	size_t w = old_base.getWidth();
+	size_t h = old_base.getHeight();
 
 	if (fs::exists(dir / "1")) {
 		// at first rename the directories 1 2 3 4 (zoom level 0) and make new directories

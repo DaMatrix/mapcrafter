@@ -20,19 +20,19 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_
 
+#include "../util/other.h" //util::UninitializedTag
+#include "../config.h" //AUTO_TARGET_CLONES
+
 #define _USE_MATH_DEFINES
 #include <cassert>
 #include <cmath>
 #include <math.h> // to be sure M_PI is defined
 
-#include <algorithm> //std::copy_n()
+#include <algorithm> //std::copy(), std::fill()
 #include <array>
 #include <cstdint>
 #include <memory> //std::unique_ptr
-#include <string>
-#include <tuple>
 #include <utility> //std::move(), std::swap()
-#include <vector>
 
 namespace mapcrafter {
 namespace renderer {
@@ -176,27 +176,26 @@ void blend(RGBAPixel& dest, const RGBAPixel& source);
 template <typename Pixel>
 class Image {
 public:
-	Image() : width(0), height(0), data(nullptr) {}
-	Image(int width, int height) : width(width), height(height), data(new Pixel[width * height]()) {}
+	Image() noexcept
+		: width(0), height(0), data(nullptr) {}
+	Image(size_t width, size_t height)
+		: width(width), height(height), data(new Pixel[width * height]()) {}
+	Image(size_t width, size_t height, util::UninitializedTag)
+		: width(width), height(height), data(new Pixel[width * height]) {}
 
-    Image(const Image& src) : width(src.width), height(src.height), data(new Pixel[src.width * src.height]) {
+    Image(const Image& src) : Image(src.width, src.height, util::UninitializedTag{}) {
         std::copy(src.begin(), src.end(), begin());
     }
 
-	Image(Image &&src) noexcept
-			: width(src.width),
-			  height(src.height),
-			  data(std::move(src.data)) {
-		src.width = src.height = 0;
+	Image(Image&& src) noexcept
+			: width(src.width), height(src.height), data(std::move(src.data)) {
+		src.width = 0;
+		src.height = 0;
 	}
 
     Image& operator=(const Image& src) {
         if (&src != this) {
-            if (src.width * src.height != width * height) {
-                data.reset(new Pixel[src.width * src.height]);
-            }
-            width = src.width;
-            height = src.height;
+			setSize(src.width, src.height, util::UninitializedTag{});
             std::copy(src.begin(), src.end(), begin());
         }
         return *this;
@@ -204,45 +203,84 @@ public:
 
     Image& operator=(Image&& src) noexcept {
         if (&src != this) {
-            std::swap(width, src.width);
-            std::swap(height, src.height);
-			std::swap(data, src.data);
+			width = src.width;
+			height = src.height;
+			src.width = 0;
+			src.height = 0;
+
+			data.reset(src.data.release());
         }
         return *this;
     }
 
-	int getWidth() const;
-	int getHeight() const;
+	size_t getWidth() const { return width; }
+	size_t getHeight() const { return height; }
 
-	size_t getPixelCount() const { return static_cast<size_t>(width) * height; }
+	size_t getPixelCount() const { return width * height; }
 	bool isSameSize(const Image& other) const { return width == other.width && height == other.height; }
 
-	Pixel getPixel(int x, int y) const;
-	void setPixel(int x, int y, Pixel pixel);
+	Pixel getPixel(size_t x, size_t y) const { return x >= width || y >= height ? 0 : pixel(x, y); }
+	void setPixel(size_t x, size_t y, Pixel pixel) {
+		if (x < width && y < height)
+			this->pixel(x, y) = pixel;
+	}
 
-	inline const Pixel& pixel(int x, int y) const;
+	Pixel& pixel(size_t x, size_t y) { assert(x < width && y < height); return data[y * width + x]; }
+	const Pixel& pixel(size_t x, size_t y) const { assert(x < width && y < height); return data[y * width + x]; }
 
-	inline Pixel& pixel(int x, int y);
+	/**
+	 * Sets all pixels in this image to the default value.
+	 */
+	void clear() noexcept {
+		std::fill(begin(), end(), Pixel());
+	}
 
-	void setSize(int width, int height);
+	/**
+	 * Sets this image to the given size. All pixels will be initialized to the default value.
+	 * @param new_width the new image width
+	 * @param new_height the new image height
+	 */
+	//TODO: this is kinda redundant, everything that uses this function seems to assume the pixels are uninitialized
+	void setSize(size_t new_width, size_t new_height) {
+		setSize(new_width, new_height, util::UninitializedTag{});
+		clear();
+	}
+
+	/**
+	 * Sets this image to the given size. All pixels will be initialized with undefined contents.
+	 * @param new_width the new image width
+	 * @param new_height the new image height
+	 */
+	void setSize(size_t new_width, size_t new_height, util::UninitializedTag) {
+		if (width * height != new_width * new_height) {
+			data.reset(new Pixel[new_width * new_height]);
+		}
+		width = new_width;
+		height = new_height;
+	}
 
 //protected:
-	int width;
-	int height;
+	size_t width;
+	size_t height;
 
 	std::unique_ptr<Pixel[]> data;
 
+public:
     Pixel* begin() { return data.get(); }
     Pixel* end() { return data.get() + getPixelCount(); }
 
     const Pixel* begin() const { return data.get(); }
     const Pixel* end() const { return data.get() + getPixelCount(); }
-};
 
-const int ROTATE_0 = 0;
-const int ROTATE_90 = 1;
-const int ROTATE_180 = 2;
-const int ROTATE_270 = 3;
+    Pixel* rowbegin(size_t row) { assert(row < height); return begin() + row * width; }
+    Pixel* rowend(size_t row) { assert(row < height); return begin() + (row + 1) * width; }
+
+    const Pixel* rowbegin(size_t row) const { assert(row < height); return begin() + row * width; }
+    const Pixel* rowend(size_t row) const { assert(row < height); return begin() + (row + 1) * width; }
+
+protected:
+	bool containsRect(size_t x, size_t y, size_t w, size_t h) const;
+};
 
 enum class InterpolationType {
 	// nearest-neighbor interpolation, simple one
@@ -263,63 +301,35 @@ struct WritePngOptions {
 class RGBAImage : public Image<RGBAPixel> {
 public:
 	RGBAImage() : Image<RGBAPixel>() {}
-	RGBAImage(int width, int height);
+	RGBAImage(size_t width, size_t height) : Image<RGBAPixel>(width, height) {}
+	RGBAImage(size_t width, size_t height, util::UninitializedTag u) : Image<RGBAPixel>(width, height, u) {}
 
 	/**
 	 * Blits one image to another one. Just copies the pixels over without any processing.
 	 */
-	void simpleBlit(const RGBAImage& image, int x, int y);
+	void simpleBlit(const RGBAImage& image, size_t x, size_t y);
 
 	/**
 	 * Blits one image to another one. Just copies the pixels over, but skips completely
 	 * transparent pixels (alpha(pixel) == 0).
 	 */
-	void simpleAlphaBlit(const RGBAImage& image, int x, int y);
+	AUTO_TARGET_CLONES void simpleAlphaBlit(const RGBAImage& image, size_t x, size_t y);
 
 	/**
 	 * Blits one image to another one. Also Alphablends transparent pixels of the source
 	 * image with the pixels of the destination image.
 	 */
-	void alphaBlit(const RGBAImage& image, int x, int y);
-	void blendPixel(RGBAPixel color, int x, int y);
+	AUTO_TARGET_CLONES void alphaBlit(const RGBAImage& image, int x, int y);
 
-	void fill(RGBAPixel color, int x1, int y1, int w, int h);
-	void clear();
+	RGBAImage clip(size_t x, size_t y, size_t w, size_t h) const;
 
-	RGBAImage clip(int x, int y, int width, int height) const;
-	RGBAImage colorize(double r, double g, double b, double a = 1) const;
-	RGBAImage colorize(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) const;
-	RGBAImage rotate(int rotation) const;
-	RGBAImage flip(bool flip_x, bool flip_y) const;
-	RGBAImage move(int x_off, int y_off) const;
-
-	void resize(RGBAImage& dest, int width, int height,
+	void resize(RGBAImage& dest, size_t width, size_t height,
 			InterpolationType interpolation = InterpolationType::AUTO) const;
 
-	RGBAImage resize(int width, int height,
+	RGBAImage resize(size_t width, size_t height,
 			InterpolationType interpolation = InterpolationType::AUTO) const;
 
-	/**
-	 * (In-place) Shearing along the x-axis by a specific factor.
-	 */
-	RGBAImage& shearX(double factor);
-
-	/**
-	 * (In-place) Shearing along the y-axis by a specific factor.
-	 */
-	RGBAImage& shearY(double factor);
-
-	/**
-	 * (In-place) Rotation by shearing:
-	 * https://www.ocf.berkeley.edu/~fricke/projects/israel/paeth/rotation_by_shearing.html
-	 */
-	RGBAImage& rotateByShear(double degrees);
-
-	/**
-	 * Applies a simple blur filter to the image. Uses the specified radius for the
-	 * (quadratic) blur effect.
-	 */
-	void blur(RGBAImage& dest, int radius) const;
+	RGBAImage resizeHalf() const;
 
 	//these functions may throw an std::exception or return false to indicate failure
 	void readPNG(const std::string& filename);
@@ -330,51 +340,6 @@ public:
 	bool writeJPEG(const std::string& filename, int quality,
 			RGBAPixel background = rgba(255, 255, 255, 255)) const;
 };
-
-template <typename Pixel>
-int Image<Pixel>::getWidth() const {
-	return width;
-}
-
-template <typename Pixel>
-int Image<Pixel>::getHeight() const {
-	return height;
-}
-
-template <typename Pixel>
-Pixel Image<Pixel>::getPixel(int x, int y) const {
-	if (x >= width || x < 0 || y >= height || y < 0)
-		return 0;
-	return data[y * width + x];
-}
-
-template <typename Pixel>
-inline void Image<Pixel>::setPixel(int x, int y, Pixel pixel) {
-	if (x >= width || x < 0 || y >= height || y < 0)
-		return;
-	data[y * width + x] = pixel;
-}
-
-template <typename Pixel>
-inline const Pixel& Image<Pixel>::pixel(int x, int y) const {
-	return data[y * width + x];
-}
-
-template <typename Pixel>
-Pixel& Image<Pixel>::pixel(int x, int y) {
-	return data[y * width + x];
-}
-
-template <typename Pixel>
-void Image<Pixel>::setSize(int width, int height) {
-	if ((width!=this->width) || (height!=this->height)) {
-        if (width * height != this->width * this->height) {
-            data.reset(new Pixel[width * height]());
-        }
-		this->width = width;
-		this->height = height;
-	}
-}
 
 }
 }

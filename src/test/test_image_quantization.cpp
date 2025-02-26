@@ -57,17 +57,14 @@ void testOctreeWithImage(const RGBAImage& image) {
 	Octree octree;
 
 	// insert all pixels into an octree
-	for (int x = 0; x < image.getWidth(); x++) {
-		for (int y = 0; y < image.getHeight(); y++) {
-			RGBAPixel color = image.getPixel(x, y);
-			colors.insert(color);
-			r += rgba_red(color);
-			g += rgba_green(color);
-			b += rgba_blue(color);
-			count++;
+	for (RGBAPixel color : image) {
+		colors.insert(color);
+		r += rgba_red(color);
+		g += rgba_green(color);
+		b += rgba_blue(color);
+		count++;
 
-			Octree::findOrCreateNode(&octree, color)->setColor(color);
-		}
+		Octree::findOrCreateNode(&octree, color)->setColor(color);
 	}
 
 	// make sure that all colors are inserted correctly
@@ -84,7 +81,7 @@ void testOctreeWithImage(const RGBAImage& image) {
 	BOOST_CHECK_EQUAL(average1, average2);
 
 	BOOST_TEST_MESSAGE("Overall colors: " << colors.size());
-	BOOST_TEST_MESSAGE("Pixels per color: " << (double) (image.getWidth() * image.getHeight()) / colors.size());
+	BOOST_TEST_MESSAGE("Pixels per color: " << (double) (image.getPixelCount()) / colors.size());
 	BOOST_TEST_MESSAGE("Average color: " << (int) rgba_red(average1) << ","
 			<< (int) rgba_green(average1) << "," << (int) rgba_blue(average1));
 }
@@ -134,9 +131,9 @@ BOOST_AUTO_TEST_CASE(image_quantization_octree) {
 	// create a random image to test octree with
 	BOOST_TEST_MESSAGE("Testing random image.");
 	RGBAImage random(1000, 1000);
-	for (int x = 0; x < random.getWidth(); x++)
-		for (int y = 0; y < random.getHeight(); y++)
-			random.setPixel(x, y, rgba(rand() % 256, rand() % 256, rand() % 256, 255));
+	for (renderer::RGBAPixel& pixel : random) {
+		pixel = renderer::rgba(rand() % 256, rand() % 256, rand() % 256, rand() % 256);
+	}
 	testOctreeWithImage(random);
 
 	// and also check it with this cute platypus

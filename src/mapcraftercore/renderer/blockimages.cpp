@@ -144,7 +144,7 @@ static std::array<uint32_t, 3> blockImageMultiply_PreprocessFactors(
 }
 
 static void blockImageMultiply_scalar(
-        RGBAPixel* block, const RGBAPixel* uv_mask, int i, int n,
+        RGBAPixel* block, const RGBAPixel* uv_mask, size_t i, size_t n,
         const std::array<uint32_t, 3>& f, const LightFnc& light_fnc) {
 	for (; i < n; i++) {
         uint32_t pixel = block[i];
@@ -180,8 +180,8 @@ static void blockImageMultiply_scalar(
 #endif
 
 ATTRIBUTE_TARGET_AVX2
-static int blockImageMultiply_AVX2(
-        RGBAPixel* block, const RGBAPixel* uv_mask, int i, int n,
+static size_t blockImageMultiply_AVX2(
+        RGBAPixel* block, const RGBAPixel* uv_mask, size_t i, size_t n,
         const std::array<uint32_t, 3>& f, const LightFnc& light_fnc) {
     using uint32x8 = simd::vec<uint32_t, 8>;
 
@@ -241,8 +241,8 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 
     std::array<uint32_t, 3> f = blockImageMultiply_PreprocessFactors(factors_left, factors_right, factors_up);
 
-	int n = block.getWidth() * block.getHeight();
-    int i = 0;
+	size_t n = block.getPixelCount();
+    size_t i = 0;
 
     //vectorized element processing
     i = blockImageMultiply_AVX2(&block.data[0], &uv_mask.data[0], i, n, f, light_fnc);
@@ -263,7 +263,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 
     std::array<uint32_t, 3> f = blockImageMultiply_PreprocessFactors(factors_left, factors_right, factors_up);
 
-	int n = block.getWidth() * block.getHeight();
+	size_t n = block.getPixelCount();
 
     blockImageMultiply_scalar(&block.data[0], &uv_mask.data[0], 0, n, f, light_fnc);
 }
@@ -386,7 +386,7 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 		uint8_t north, uint8_t south, uint8_t east, uint8_t west, uint8_t bottomleft, uint8_t bottomright) {
 	assert(block.isSameSize(uv_mask));
 
-	size_t n = block.getWidth() * block.getHeight();
+	size_t n = block.getPixelCount();
 	for (size_t i = 0; i < n; i++) {
 		RGBAPixel& pixel = block.data[i];
 		const RGBAPixel& uv_pixel = uv_mask.data[i];
@@ -629,7 +629,7 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 
     for (uint32_t image_uv_index : all_image_uv_indices) {
         const RGBAImage& image = BlockAtlas::instance().GetImage(image_uv_index);
-        int n = image.getWidth() * image.getHeight();
+        size_t n = image.getPixelCount();
 
         for (int i = 0; i < n; i++) {
             auto& pixel = image.data[i];
@@ -828,8 +828,7 @@ void RenderedBlockImages::runBenchmark() {
 
 	std::chrono::time_point<clock_> begin = clock_::now();
 	const RGBAImage& image = solid.image(0);
-	RGBAImage solid_image(image.getHeight(), image.getWidth());
-	solid_image.simpleBlit(image,0,0);
+	RGBAImage solid_image = image;
 
 	for (size_t i = 0; i < 1000000; i++) {
 

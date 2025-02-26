@@ -138,181 +138,76 @@ static void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length) 
 	((std::string*) a)->append((char*) data, length);
 }
 
-RGBAImage::RGBAImage(int width, int height)
-	: Image<RGBAPixel>(width, height) {
+template<typename Pixel>
+bool Image<Pixel>::containsRect(size_t x, size_t y, size_t w, size_t h) const {
+	return x <= this->width && x + w <= this->width &&
+		   y <= this->height && y + h <= this->height;
 }
 
-void RGBAImage::simpleBlit(const RGBAImage& image, int x, int y) {
-	if (x >= width || y >= height)
-		return;
+void RGBAImage::simpleBlit(const RGBAImage& image, size_t x, size_t y) {
+	assert(containsRect(x, y, image.width, image.height));
 
-	int sx = std::max(0, -x);
-	int sy;
-	for (; sx < image.width && sx+x < width; sx++) {
-		sy = std::max(0, -y);
-		for (; sy < image.height && sy+y < height; sy++) {
-				data[(sy+y) * width + (sx+x)] = image.data[sy * image.width + sx];
-		}
+	size_t src_width = image.width;
+	size_t src_height = image.height;
+	const RGBAPixel* src_it = image.begin();
+	size_t dst_width = width;
+	RGBAPixel* dst_it = begin() + y * width + x;
+	for (size_t row = 0; row < src_height; row++, src_it += src_width, dst_it += dst_width) {
+		std::copy(src_it, src_it + src_width, dst_it);
 	}
 }
 
-void RGBAImage::simpleAlphaBlit(const RGBAImage& image, int x, int y) {
-	if (x >= width || y >= height)
-		return;
+AUTO_TARGET_CLONES void RGBAImage::simpleAlphaBlit(const RGBAImage& image, size_t x, size_t y) {
+	assert(containsRect(x, y, image.width, image.height));
 
-	/*
-	int dx = MAX(x, 0);
-	int sx = MAX(0, -x);
-	for (; sx < image.width && dx < width; sx++, dx++) {
-		int dy = MAX(y, 0);
-		int sy = MAX(0, -y);
-		for (; sy < image.height && dy < height; sy++, dy++) {
-			//blend(data[dy*width+dx], image.data[sy*image.width+sx]);
-
-			if (ALPHA(image.data[sy*image.width+sx]) != 0) {
-				data[dy * width + dx] = image.data[sy * image.width + sx];
-			}
-		}
-	}
-	*/
-
-	int sx = std::max(0, -x);
-	int sy;
-	for (; sx < image.width && sx+x < width; sx++) {
-		sy = std::max(0, -y);
-		for (; sy < image.height && sy+y < height; sy++) {
-			if (rgba_alpha(image.data[sy*image.width+sx]) != 0) {
-				data[(sy+y) * width + (sx+x)] = image.data[sy * image.width + sx];
-			}
-		}
+	size_t src_width = image.width;
+	size_t src_height = image.height;
+	const RGBAPixel* src_it = image.begin();
+	size_t dst_width = width;
+	RGBAPixel* dst_it = begin() + y * width + x;
+	for (size_t row = 0; row < src_height; row++, src_it += src_width, dst_it += dst_width) {
+		std::transform(
+				src_it, src_it + src_width, dst_it, dst_it,
+				[](RGBAPixel src_pixel, RGBAPixel dst_pixel) -> RGBAPixel {
+					return rgba_alpha(src_pixel) != 0 ? src_pixel : dst_pixel;
+				});
 	}
 }
 
-void RGBAImage::alphaBlit(const RGBAImage& image, int x, int y) {
-	if (x >= width || y >= height)
-		return;
+AUTO_TARGET_CLONES void RGBAImage::alphaBlit(const RGBAImage& image, int x, int y) {
+	assert(containsRect(x, y, image.width, image.height));
 
-	/*
-	int dx = MAX(x, 0);
-	int sx = MAX(0, -x);
-	for (; sx < image.width && dx < width; sx++, dx++) {
-		int dy = MAX(y, 0);
-		int sy = MAX(0, -y);
-		for (; sy < image.height && dy < height; sy++, dy++) {
-			blend(data[dy * width + dx], image.data[sy * image.width + sx]);
-		}
-	}
-	*/
-
-	int sx = std::max(0, -x);
-	int sy;
-	for (; sx < image.width && sx+x < width; sx++) {
-		sy = std::max(0, -y);
-		for (; sy < image.height && sy+y < height; sy++) {
-			blend(data[(sy+y) * width + (sx+x)], image.data[sy * image.width + sx]);
-		}
+	size_t src_width = image.width;
+	size_t src_height = image.height;
+	const RGBAPixel* src_it = image.begin();
+	size_t dst_width = width;
+	RGBAPixel* dst_it = begin() + y * width + x;
+	for (size_t row = 0; row < src_height; row++, src_it += src_width, dst_it += dst_width) {
+		std::transform(
+				src_it, src_it + src_width, dst_it, dst_it,
+				[](RGBAPixel src_pixel, RGBAPixel dst_pixel) -> RGBAPixel {
+					blend(dst_pixel, src_pixel);
+					return dst_pixel;
+				});
 	}
 }
 
-void RGBAImage::blendPixel(RGBAPixel color, int x, int y) {
-	if (x >= 0 && y >= 0 && x < width && y < height)
-		blend(data[y * width + x], color);
-}
+RGBAImage RGBAImage::clip(size_t x, size_t y, size_t w, size_t h) const {
+	assert(containsRect(x, y, w, h));
 
-void RGBAImage::fill(RGBAPixel color, int x, int y, int w, int h) {
-	if (x >= width || y >= height)
-		return;
+	RGBAImage image(w, h, util::UninitializedTag{});
 
-	int dx = std::max(x, 0);
-	int sx = std::max(0, -x);
-	for (; sx < w && dx < width; sx++, dx++) {
-		int dy = std::max(y, 0);
-		int sy = std::max(0, -y);
-		for (; sy < h && dy < height; sy++, dy++) {
-			data[dy * width + dx] = color;
-		}
-	}
-}
+	size_t src_width = width;
+	const RGBAPixel* src_it = begin() + y * src_width + x;
+	RGBAPixel* dst_it = image.begin();
 
-void RGBAImage::clear() {
-	std::fill(begin(), end(), 0);
-}
-
-RGBAImage RGBAImage::clip(int x, int y, int width, int height) const {
-	RGBAImage image(width, height);
-	for (int xx = 0; xx < width && xx + x < this->width; xx++) {
-		for (int yy = 0; yy < height && yy + y < this->height; yy++) {
-			image.setPixel(xx, yy, getPixel(x + xx, y + yy));
-		}
+	for (size_t row = 0; row < h; row++, src_it += src_width, dst_it += w) {
+		std::copy(src_it, src_it + w, dst_it);
 	}
 	return image;
 }
 
-RGBAImage RGBAImage::colorize(double r, double g, double b, double a) const {
-	RGBAImage img(width, height);
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			img.setPixel(x, y, rgba_multiply(getPixel(x, y), r, g, b, a));
-		}
-	}
-	return img;
-}
-
-RGBAImage RGBAImage::colorize(uint8_t r, uint8_t g, uint8_t b, uint8_t a) const {
-	RGBAImage img(width, height);
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			img.setPixel(x, y, rgba_multiply(getPixel(x, y), r, g, b, a));
-		}
-	}
-	return img;
-}
-
-RGBAImage RGBAImage::rotate(int rotation) const {
-	// TODO rotate by rotation % 4?
-	if (rotation == 0)
-		return *this;
-	int newWidth = rotation == ROTATE_90 || rotation == ROTATE_270 ? height : width;
-	int newHeight = rotation == ROTATE_90 || rotation == ROTATE_270 ? width : height;
-	RGBAImage copy(newWidth, newHeight);
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			RGBAPixel pixel = 0;
-			if (rotation == ROTATE_90)
-				pixel = getPixel(y, width - x - 1);
-			else if (rotation == ROTATE_180)
-				pixel = getPixel(width - x - 1, height - y - 1);
-			else if (rotation == ROTATE_270)
-				pixel = getPixel(height - y - 1, x);
-			copy.setPixel(x, y, pixel);
-		}
-	}
-	return copy;
-}
-
-RGBAImage RGBAImage::flip(bool flipX, bool flipY) const {
-	RGBAImage copy(width, height);
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			int xx = flipX ? width - x - 1 : x;
-			int yy = flipY ? height - y - 1 : y;
-			copy.setPixel(x, y, getPixel(xx, yy));
-		}
-	}
-	return copy;
-}
-
-RGBAImage RGBAImage::move(int xOffset, int yOffset) const {
-	RGBAImage img(width, height);
-	for (int y = 0; y < height && y + yOffset < height; y++) {
-		for (int x = 0; x < width && x + xOffset < width; x++) {
-			img.setPixel(x + xOffset, y + yOffset, getPixel(x, y));
-		}
-	}
-	return img;
-}
-
-void RGBAImage::resize(RGBAImage& dest, int width, int height, InterpolationType interpolation) const {
+void RGBAImage::resize(RGBAImage& dest, size_t width, size_t height, InterpolationType interpolation) const {
 	if (width == getWidth() && height == getHeight()) {
 		dest = *this;
 		return;
@@ -337,7 +232,7 @@ void RGBAImage::resize(RGBAImage& dest, int width, int height, InterpolationType
 	}
 }
 
-RGBAImage RGBAImage::resize(int width, int height, InterpolationType interpolation) const {
+RGBAImage RGBAImage::resize(size_t width, size_t height, InterpolationType interpolation) const {
 	if (width == getWidth() && height == getHeight())
 		return *this;
 	RGBAImage temp;
@@ -345,74 +240,10 @@ RGBAImage RGBAImage::resize(int width, int height, InterpolationType interpolati
 	return temp;
 }
 
-
-RGBAImage& RGBAImage::shearX(double factor) {
-	for (int y = 0; y < height; y++) {
-		int shear = -(y - height/2) * factor;
-		int start = shear > 0 ? width-1 : 0;
-		int dir = shear > 0 ? -1 : 1;
-		for (int x = start; x >= 0 && x < width; x += dir)
-			setPixel(x, y, getPixel(x - shear, y));
-	}
-	return *this;
-}
-
-RGBAImage& RGBAImage::shearY(double factor) {
-	for (int x = 0; x < width; x++) {
-		int shear = -(x - width/2) * factor;
-		int start = shear > 0 ? height-1 : 0;
-		int dir = shear > 0 ? -1 : 1;
-		for (int y = start; y >= 0 && y < height; y += dir)
-			setPixel(x, y, getPixel(x, y - shear));
-	}
-	return *this;
-}
-
-RGBAImage& RGBAImage::rotateByShear(double degrees) {
-	// some tricks to minimize the broken parts of the image caused by the shearing
-	while (degrees < 0)
-		degrees += 360;
-	while (degrees > 360)
-		degrees -= 360;
-	if (degrees > 90) {
-		int n = degrees / 90;
-		// unfortunately this is not in-place // TODO ?
-		*this = rotate(n);
-		degrees -= n*90;
-	}
-
-	double radians = degrees / 180.0 * M_PI;
-	shearX(-std::tan(radians/2));
-	shearY(std::sin(radians));
-	shearX(-std::tan(radians/2));
-	return *this;
-}
-
-RGBAPixel blurKernel(const RGBAImage& image, int x, int y, int radius) {
-	int r = 0, g = 0, b = 0, a = 0;
-	int count = 0;
-	for (int dx = -radius; dx <= radius; dx++)
-		for (int dy = -radius; dy <= radius; dy++) {
-			int x2 = x + dx;
-			int y2 = y + dy;
-			if (x2 < 0 || y2 < 0 || x2 >= image.getWidth() || y2 >= image.getHeight())
-				continue;
-			RGBAPixel pixel = image.getPixel(x2, y2);
-			r += (int) rgba_red(pixel) * (int) rgba_alpha(pixel);
-			g += (int) rgba_green(pixel) * (int) rgba_alpha(pixel);
-			b += (int) rgba_blue(pixel) * (int) rgba_alpha(pixel);
-			a += rgba_alpha(pixel);
-			count++;
-		}
-	return a ? rgba(r / a, g / a, b / a, a / count) : 0;
-}
-
-void RGBAImage::blur(RGBAImage& dest, int radius) const {
-	dest.setSize(width, height);
-
-	for (int x = 0; x < width; x++)
-		for (int y = 0; y < height; y++)
-			dest.pixel(x, y) = blurKernel(*this, x, y, radius);
+RGBAImage RGBAImage::resizeHalf() const {
+	RGBAImage result;
+	imageResizeHalf(*this, result);
+	return result;
 }
 
 #if HAVE_SPNG_LIBRARY
@@ -736,11 +567,9 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, const WritePngOptio
 	}
 
 	png_bytep* rows = (png_bytep*) png_malloc(png, height * sizeof(png_bytep));
-	for (int y = 0; y < height; y++) {
-		rows[y] = (png_byte*) png_malloc(png, width * sizeof(png_byte));
-		for (int x = 0; x < width; x++)
-			rows[y][x] = 0;
-		for (int x = 0; x < width; x++) {
+	for (size_t y = 0; y < height; y++) {
+		rows[y] = (png_byte*) png_calloc(png, width * sizeof(png_byte));
+		for (size_t x = 0; x < width; x++) {
 			if (dithered) {
 				setRowPixel(rows[y], palette_bits, x, data_dithered[y * width + x]);
 			} else {
@@ -756,7 +585,7 @@ bool RGBAImage::writeIndexedPNG(const std::string& filename, const WritePngOptio
 	//else
 		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);
 
-	for (int y = 0; y < height; y++)
+	for (size_t y = 0; y < height; y++)
 		png_free(png, rows[y]);
 	png_free(png, rows);
 	png_free(png, palette);
@@ -915,7 +744,7 @@ bool RGBAImage::readJPEG(const std::string& filename) {
 		 */
 		(void) jpeg_read_scanlines(&cinfo, buffer, 1);
 		/* Assume put_scanline_someplace wants a pointer and sample count. */
-		for(int x = 0; x < width; x++) {
+		for(size_t x = 0; x < width; x++) {
 			uint8_t red = buffer[0][3 * x];
 			uint8_t green = buffer[0][3 * x + 1];
 			uint8_t blue = buffer[0][3 * x + 2];
@@ -1043,7 +872,7 @@ bool RGBAImage::writeJPEG(const std::string& filename, int quality,
 		 * Here the array is only one element long, but you could pass
 		 * more than one scanline at a time if that's more convenient.
 		 */
-		for (int x = 0; x < width; x++) {
+		for (size_t x = 0; x < width; x++) {
 			RGBAPixel color = pixel(x, cinfo.next_scanline);
 			// jpeg does not support transparency
 			// add background color if this pixel has transparency
