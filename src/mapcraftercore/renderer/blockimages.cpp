@@ -278,7 +278,7 @@ void blockImageMultiply(RGBAImage &block, NormalizedUInt8 factor) {
 		});
 }
 
-void blockImageTint(RGBAImage &block, const RGBAImage &mask, RGBAPixel color) {
+AUTO_TARGET_CLONES void blockImageTint(RGBAImage &block, const RGBAImage &mask, RGBAPixel color) {
 	assert(block.isSameSize(mask));
 
 	std::transform(
@@ -289,7 +289,7 @@ void blockImageTint(RGBAImage &block, const RGBAImage &mask, RGBAPixel color) {
 				// but to be blend in with block pixel
 				// This will avoid white pixels on edges of the mask
 				RGBAPixel colored_mask_pixel = rgba_multiply(mask_pixel, color);
-				blend(pixel, colored_mask_pixel);
+				pixel = rgba_alphablend(pixel, colored_mask_pixel);
 			}
 			return pixel;
 		});
@@ -371,13 +371,11 @@ void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 
 		// use the Z value of each pixels to blend or not the top pixel
 		if (rgba_alpha(uv_pixel) < rgba_alpha(top_uv_pixel)) {
-			blend(pixel, top_pixel);
+			pixel = rgba_alphablend(pixel, top_pixel);
 		} else {
 			// The top pixel is behind the block one, so use the alpha of
 			// the destination pixel to blend the top pixel behind
-			RGBAPixel tmp_pix = pixel;
-			pixel = top_pixel;
-			blend(pixel, tmp_pix);
+			pixel = rgba_alphablend(top_pixel, pixel);
 		}
 	}
 }

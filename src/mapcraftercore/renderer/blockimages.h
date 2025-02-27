@@ -114,7 +114,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		const LightFnc& light_fnc);
 
 AUTO_TARGET_CLONES void blockImageMultiply(RGBAImage& block, NormalizedUInt8 factor);
-void blockImageTint(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
+AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, const RGBAImage& mask, RGBAPixel color);
 
 // TODO maybe this should be named something with multiply too
 AUTO_TARGET_CLONES void blockImageTint(RGBAImage& block, RGBAPixel color);

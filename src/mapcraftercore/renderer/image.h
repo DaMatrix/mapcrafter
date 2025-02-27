@@ -37,6 +37,9 @@
 namespace mapcrafter {
 namespace renderer {
 
+/**
+ * An 8-bit integer normalized to the range [0, 1]
+ */
 struct NormalizedUInt8 {
 	uint8_t value;
 
@@ -54,17 +57,17 @@ struct NormalizedUInt8 {
 		return *this;
 	}
 
-	bool operator==(const NormalizedUInt8 &rhs) const { return value == rhs.value; }
-	bool operator!=(const NormalizedUInt8 &rhs) const { return value != rhs.value; }
-	bool operator< (const NormalizedUInt8 &rhs) const { return value <  rhs.value; }
-	bool operator<=(const NormalizedUInt8 &rhs) const { return value <= rhs.value; }
-	bool operator> (const NormalizedUInt8 &rhs) const { return value >  rhs.value; }
-	bool operator>=(const NormalizedUInt8 &rhs) const { return value >= rhs.value; }
+	bool operator==(const NormalizedUInt8& rhs) const { return value == rhs.value; }
+	bool operator!=(const NormalizedUInt8& rhs) const { return value != rhs.value; }
+	bool operator< (const NormalizedUInt8& rhs) const { return value <  rhs.value; }
+	bool operator<=(const NormalizedUInt8& rhs) const { return value <= rhs.value; }
+	bool operator> (const NormalizedUInt8& rhs) const { return value >  rhs.value; }
+	bool operator>=(const NormalizedUInt8& rhs) const { return value >= rhs.value; }
 
 	operator uint8_t() const { return value; }
 
-	explicit operator float() const { return static_cast<float>(value) / 255.0f; }
-	explicit operator double() const { return static_cast<double>(value) / 255.0; }
+	float toFloat() const { return static_cast<float>(value) / 255.0f; }
+	double toDouble() const { return static_cast<double>(value) / 255.0; }
 
 	template<typename T>
 	static typename std::enable_if<std::is_floating_point<T>::value, NormalizedUInt8>::type fromFloatingPoint(T f) {
@@ -79,6 +82,12 @@ inline NormalizedUInt8 addSaturating(const NormalizedUInt8& lhs, const Normalize
 		result = 0xFF;
 	}
 	return NormalizedUInt8(result);
+}
+
+inline NormalizedUInt8 multiply(const NormalizedUInt8& lhs, const NormalizedUInt8& rhs) {
+	//approximately equal to:
+	//  uint8_t result = ((double) lhs.value / 255.0) * ((double) rhs.value / 255.0) * 255.0;
+	return NormalizedUInt8(((lhs.value + 1) * rhs.value) >> 8);
 }
 
 typedef uint32_t RGBAPixel;
@@ -119,18 +128,18 @@ inline RGBAPixel rgba_average(RGBAPixel v1, RGBAPixel v2) {
 }
 
 inline RGBAPixel rgba_multiply(RGBAPixel v1, RGBAPixel v2) {
-	uint32_t r = ((((v1 & 0xff) + 0x01) * (v2 & 0xff)) >> 8) & 0xff;
-	uint32_t g = ((((v1 & 0xff00) + 0x0100) * (v2 & 0xff00)) >> 16) & 0xff00;
-	uint32_t b = ((((uint64_t) (v1 & 0xff0000) + 0x010000) * (v2 & 0xff0000)) >> 24) & 0xff0000;
-	return (v1 & 0xff000000) | r | g | b;
+	uint8_t r = (rgba_red(v1) * (rgba_red(v2) + 1)) >> 8;
+	uint8_t g = (rgba_green(v1) * (rgba_green(v2) + 1)) >> 8;
+	uint8_t b = (rgba_blue(v1) * (rgba_blue(v2) + 1)) >> 8;
+	return rgba(r, g, b, rgba_alpha(v1));
 }
 
 inline RGBAPixel rgba_multiply_with_alpha(RGBAPixel v1, RGBAPixel v2) {
-	uint32_t r = (((v1 & 0xff) + 0x01) * (v2 & 0xff) >> 8) & 0xff;
-	uint32_t g = (((v1 & 0xff00) + 0x0100)  * (v2 & 0xff00) >> 16) & 0xff00;
-	uint32_t b = ((((uint64_t) (v1 & 0xff0000) + 0x010000) * (v2 & 0xff0000)) >> 24) & 0xff0000;
-	uint32_t a = ((((uint64_t) (v1 & 0xff000000) + 0x01000000) * (v2 & 0xff000000)) >> 32) & 0xff000000;
-	return a | r | g | b;
+	uint8_t r = (rgba_red(v1) * (rgba_red(v2) + 1)) >> 8;
+	uint8_t g = (rgba_green(v1) * (rgba_green(v2) + 1)) >> 8;
+	uint8_t b = (rgba_blue(v1) * (rgba_blue(v2) + 1)) >> 8;
+	uint8_t a = (rgba_alpha(v1) * (rgba_alpha(v2) + 1)) >> 8;
+	return rgba(r, g, b, a);
 }
 
 // Make sure 255 x 255 = 255 by adding 1 before the mult
@@ -151,10 +160,20 @@ inline RGBAPixel rgba_multiply_with_alpha(RGBAPixel v1, RGBAPixel v2) {
 // (128+1) * 254 / 256 = 127
 // (128+1) * 255 / 256 = 128
 inline RGBAPixel rgba_multiply_scalar(RGBAPixel value, NormalizedUInt8 factor) {
-	uint32_t g = ((((value & 0xff00) + 0x0100) * factor) >> 8) & 0xff00;
-	uint32_t br = ((((value & 0xff00ff) + 0x010001) * factor) >> 8) & 0xff00ff;
+	uint32_t g = (((value & 0xff00) * (factor + 1)) >> 8) & 0xff00;
+	uint32_t br = (((value & 0xff00ff) * (factor + 1)) >> 8) & 0xff00ff;
 	uint32_t a = value & 0xff000000;
 	return a | g | br;
+}
+
+inline RGBAPixel rgba_multiply_scalar_with_alpha(RGBAPixel value, NormalizedUInt8 factor) {
+	//we shift the green+alpha to the right first so that both can be processed in parallel
+	uint32_t ga_orig = (value >> 8) & 0xff00ff;
+	uint32_t br_orig = value & 0xff00ff;
+
+	uint32_t ga = ((ga_orig * (factor + 1)) >> 8) & 0xff00ff;
+	uint32_t br = ((br_orig * (factor + 1)) >> 8) & 0xff00ff;
+	return (ga << 8) | br;
 }
 
 inline RGBAPixel rgba_add_clamp(RGBAPixel value, std::array<int, 4> add) {
@@ -171,7 +190,36 @@ inline RGBAPixel rgba_add_clamp(RGBAPixel value, int r, int g, int b, int a = 0)
 RGBAPixel rgba_multiply(RGBAPixel value, double r, double g, double b, double a = 1);
 int rgba_distance2(RGBAPixel value1, RGBAPixel value2);
 
-void blend(RGBAPixel& dest, const RGBAPixel& source);
+inline RGBAPixel rgba_alphablend(RGBAPixel dst, RGBAPixel src) {
+	//this code is simple enough to be eligible for auto-vectorization by both clang and gcc
+
+	//if source is fully transparent, leave the destination pixel unchanged.
+	//  this is technically not necessary, removing this check only affects the rgb values of fully transparent pixels.
+	if (rgba_alpha(src) == 0) return dst;
+
+	//if the destination is fully transparent, just set it to the source pixel
+	if (rgba_alpha(dst) == 0) return src;
+
+	//equivalent code assuming floating-point colors normalized on [0,1]:
+	//  vec3 result_rgba = dst.rgb * (1.0 - src.a) + src.rgb * src.a;
+	//  float result_alpha = 1.0 - (1.0 - src.a) * (1.0 - dst.a)
+	auto dst_alpha = NormalizedUInt8(rgba_alpha(dst));
+	auto one_minus_dst_alpha = NormalizedUInt8(255 - dst_alpha);
+	auto src_alpha = NormalizedUInt8(rgba_alpha(src));
+	auto one_minus_src_alpha = NormalizedUInt8(255 - src_alpha);
+
+	RGBAPixel dst_rgba_times_one_minus_src_alpha
+			= rgba_multiply_scalar_with_alpha(dst, one_minus_src_alpha);
+	RGBAPixel src_rgba_times_src_alpha
+			= rgba_multiply_scalar_with_alpha(src, src_alpha);
+	RGBAPixel result_rgb = (dst_rgba_times_one_minus_src_alpha + src_rgba_times_src_alpha) & 0x00FFFFFF;
+
+	auto one_minus_src_alpha_time_one_minus_dst_alpha
+			= multiply(one_minus_src_alpha, one_minus_dst_alpha);
+	auto result_alpha = NormalizedUInt8(255 - one_minus_src_alpha_time_one_minus_dst_alpha);
+
+	return (result_alpha << 24) | result_rgb;
+}
 
 template <typename Pixel>
 class Image {

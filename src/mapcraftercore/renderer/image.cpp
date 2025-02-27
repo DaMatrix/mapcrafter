@@ -70,57 +70,6 @@ int rgba_distance2(RGBAPixel value1, RGBAPixel value2) {
 # endif
 
 /**
- * This code is from pigmap.
- * Thanks to Michael J. Nelson (equalpants) for this fast alpha blending.
- *
- * https://github.com/equalpants/pigmap (rgba.cpp)
- */
-void blend(RGBAPixel& dest, const RGBAPixel& source) {
-	// if source is transparent, there's nothing to do
-	if (source <= 0xffffff)
-		return;
-	// if source is opaque, or if destination is transparent, just copy it over
-	else if (source >= 0xff000000 || dest <= 0xffffff)
-		dest = source;
-	// if source is translucent and dest is opaque, the color channels need to be blended,
-	//  but the new pixel will be opaque
-	else if (dest >= 0xff000000) {
-		// get sa and sainv in the range 1-256; this way, the possible results of blending 8-bit color channels sc and dc
-		//  (using sc*sa + dc*sainv) span the range 0x0000-0xffff, so we can just truncate and shift
-		int64_t sa = rgba_alpha(source) + 1;
-		int64_t sainv = 257 - sa;
-		// compute the new RGB channels
-		int64_t d = dest, s = source;
-		d = ((d << 16) & UINT64_C(0xff00000000)) | ((d << 8) & 0xff0000) | (d & 0xff);
-		s = ((s << 16) & UINT64_C(0xff00000000)) | ((s << 8) & 0xff0000) | (s & 0xff);
-		int64_t newrgb = s * sa + d * sainv;
-		// destination alpha remains 100%; combine everything and write it out
-		dest = 0xff000000 | ((newrgb >> 24) & 0xff0000) | ((newrgb >> 16) & 0xff00)
-		        | ((newrgb >> 8) & 0xff);
-
-		// both source and dest are translucent; we need the whole deal
-	} else {
-		// get sa and sainv in the range 1-256; this way, the possible results of blending 8-bit color channels sc and dc
-		//  (using sc*sa + dc*sainv) span the range 0x0000-0xffff, so we can just truncate and shift
-		int64_t sa = rgba_alpha(source) + 1;
-		int64_t sainv = 257 - sa;
-		// compute the new RGB channels
-		int64_t d = dest, s = source;
-		d = ((d << 16) & UINT64_C(0xff00000000)) | ((d << 8) & 0xff0000) | (d & 0xff);
-		s = ((s << 16) & UINT64_C(0xff00000000)) | ((s << 8) & 0xff0000) | (s & 0xff);
-		int64_t newrgb = s * sa + d * sainv;
-		// compute the new alpha channel
-		int64_t dainv = 256 - rgba_alpha(dest);
-		int64_t newa = sainv * dainv; // result is from 1-0x10000
-		newa = (newa - 1) >> 8; // result is from 0-0xff
-		newa = 255 - newa; // final result; if either input was 255, so is this, so opacity is preserved
-		// combine everything and write it out
-		dest = (newa << 24) | ((newrgb >> 24) & 0xff0000) | ((newrgb >> 16) & 0xff00)
-		        | ((newrgb >> 8) & 0xff);
-	}
-}
-
-/**
  * http://www.piko3d.com/tutorials/libpng-tutorial-loading-png-files-from-streams
  */
 static void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length) {
@@ -185,8 +134,7 @@ AUTO_TARGET_CLONES void RGBAImage::alphaBlit(const RGBAImage& image, int x, int 
 		std::transform(
 				src_it, src_it + src_width, dst_it, dst_it,
 				[](RGBAPixel src_pixel, RGBAPixel dst_pixel) -> RGBAPixel {
-					blend(dst_pixel, src_pixel);
-					return dst_pixel;
+					return rgba_alphablend(dst_pixel, src_pixel);
 				});
 	}
 }
@@ -889,8 +837,7 @@ bool RGBAImage::writeJPEG(const std::string& filename, int quality,
 			// add background color if this pixel has transparency
 			// but ignore a bit transparency
 			if (rgba_alpha(color) < 250) {
-				color = background;
-				blend(color, pixel(x, cinfo.next_scanline));
+				color = rgba_alphablend(background, color);
 			}
 
 			line_buffer[3 * x] = rgba_red(color);
