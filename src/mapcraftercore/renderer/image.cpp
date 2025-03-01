@@ -123,19 +123,27 @@ AUTO_TARGET_CLONES void RGBAImage::simpleAlphaBlit(const RGBAImage& image, size_
 }
 
 AUTO_TARGET_CLONES void RGBAImage::alphaBlit(const RGBAImage& image, int x, int y) {
-	assert(containsRect(x, y, image.width, image.height));
+	/*int sy = std::max(0, -y);
+	for (; sy < image.height && sy + y < height; sy++) {
+		int sx = std::max(0, -x);
+		for (; sx < image.width && sx + x < width; sx++) {
+			data[(sy + y) * width + (sx + x)] = rgba_alphablend(data[(sy + y) * width + (sx + x)], image.data[sy * image.width + sx]);
+		}
+	}*/
 
-	size_t src_width = image.width;
-	size_t src_height = image.height;
-	const RGBAPixel* src_it = image.begin();
-	size_t dst_width = width;
-	RGBAPixel* dst_it = begin() + y * width + x;
-	for (size_t row = 0; row < src_height; row++, src_it += src_width, dst_it += dst_width) {
-		std::transform(
-				src_it, src_it + src_width, dst_it, dst_it,
-				[](RGBAPixel src_pixel, RGBAPixel dst_pixel) -> RGBAPixel {
-					return rgba_alphablend(dst_pixel, src_pixel);
-				});
+	//annoyingly, this function gets called with coordinates which exceed the image bounds, so we need some extra logic
+	int sx = std::max(0, -x);
+	int sy = std::max(0, -y);
+	int nx = std::min(static_cast<int>(image.width) - sx, static_cast<int>(width) - (sx + x));
+	int ny = std::min(static_cast<int>(image.height) - sy, static_cast<int>(height) - (sy + y));
+	if (nx <= 0 || ny <= 0) {
+		return;
+	}
+
+	for (int iy = 0; iy < ny; iy++) {
+		const RGBAPixel* src_begin = &image.data[(sy + iy) * image.width + sx];
+		RGBAPixel* dst_begin = &data[(sy + iy + y) * width + (sx + x)];
+		std::transform(dst_begin, dst_begin + nx, src_begin, dst_begin, rgba_alphablend);
 	}
 }
 

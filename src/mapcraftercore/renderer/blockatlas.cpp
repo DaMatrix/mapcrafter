@@ -94,7 +94,7 @@ bool BlockAtlas::OpenDictionary(const fs::path& path, const std::string& name) {
 	this->block_ptrs.reserve(this->block_count);
 	assert(this->block_count <= this->shaded_blocks.size());
 	uint32_t x = 0, y = 0;
-	while (y <= blocks_y) {
+	while (y < blocks_y) {
 		std::shared_ptr<RGBAImage> ptr = std::make_shared<RGBAImage>();
 		*ptr = blocks_atlas.clip(x * block_width, y * block_height, block_width, block_height);
 		this->block_ptrs.emplace_back(ptr);
