@@ -206,6 +206,14 @@ AUTO_TARGET_CLONES RGBAImage RGBAImage::resizeHalf() const {
 	return dst;
 }
 
+AUTO_TARGET_CLONES void RGBAImage::simplifyTransparentPixels() noexcept {
+	std::transform(
+			begin(), end(), begin(),
+			[](RGBAPixel pixel) -> RGBAPixel {
+				return rgba_alpha(pixel) != 0 ? pixel : rgba(0, 0, 0, 0);
+			});
+}
+
 #if HAVE_SPNG_LIBRARY
 namespace {
 	struct spng_ctx_wrapper {

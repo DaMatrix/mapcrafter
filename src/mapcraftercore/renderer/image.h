@@ -360,6 +360,11 @@ public:
 
 	AUTO_TARGET_CLONES RGBAImage resizeHalf() const;
 
+	/**
+	 * Sets the RGB values of every fully transparent pixel to zero.
+	 */
+	AUTO_TARGET_CLONES void simplifyTransparentPixels() noexcept;
+
 	//these functions may throw an std::exception or return false to indicate failure
 	void readPNG(const std::string& filename);
 	void writePNG(const std::string& filename, const WritePngOptions& options = {}) const;

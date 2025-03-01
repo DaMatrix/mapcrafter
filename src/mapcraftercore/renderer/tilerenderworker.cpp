@@ -123,6 +123,9 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 		}
 		*/
 
+		//ensure that all transparent pixels are canonicalized before writing the image
+		image.simplifyTransparentPixels();
+
 		// save it
 		saveTile(tile, image);
 
@@ -167,6 +170,9 @@ void TileRenderWorker::renderRecursive(const TilePath& tile, RGBAImage& image) {
 					tile.setPixel(x, y, rgba(255, 0, 0, 255));
 			}
 		*/
+
+		//ensure that all transparent pixels are canonicalized before writing the image
+		image.simplifyTransparentPixels();
 
 		// then save the tile
 		saveTile(tile, image);
