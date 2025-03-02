@@ -142,11 +142,3 @@ if(OPT_LINK_BOOST_STATICALLY)
 endif()
 
 install(TARGETS mapcraftercore DESTINATION lib)
-
-if(OPT_INSTALL_HEADERS)
-    foreach(HEADER ${HEADERS})
-        string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}/" "" HEADER "${HEADER}")
-        string(REGEX MATCH "(.*)[/\\]" DIR "${HEADER}")
-        install(FILES "${HEADER}" DESTINATION "include/mapcraftercore/${DIR}")
-    endforeach(HEADER)
-endif()
