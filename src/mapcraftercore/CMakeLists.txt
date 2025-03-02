@@ -54,24 +54,26 @@ if(OPT_AUTO_SIMD)
     endif()
 endif()
 
-CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/config.h")
+set(GENERATED_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${GENERATED_SOURCE_DIR}/generated/config.h")
 
 add_custom_target(version.cpp
-    sh ./version.sh
+    sh ./version.sh "${GENERATED_SOURCE_DIR}/generated"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM
 )
-if(NOT "${CMAKE_CURRENT_SOURCE_DIR}/version.cpp")
+if(NOT "${GENERATED_SOURCE_DIR}/generated/version.cpp")
     execute_process(
-        COMMAND sh ./version.sh
+        COMMAND sh ./version.sh "${GENERATED_SOURCE_DIR}/generated"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 endif()
 
 set(SOURCE
-    "${CMAKE_CURRENT_SOURCE_DIR}/version.cpp"
+    "${GENERATED_SOURCE_DIR}/generated/version.cpp"
 )
 set(HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/config.h"
+    "${GENERATED_SOURCE_DIR}/generated/config.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/util.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/version.h"
 )
@@ -93,6 +95,10 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread/impl")
 
 add_library(mapcraftercore STATIC ${SOURCE})
 add_dependencies(mapcraftercore version.cpp)
+
+# Add generated sources to the include path.
+# This is PUBLIC because it's indirectly included by mapcrafter.cpp which is compiled as a separate target
+target_include_directories(mapcraftercore PUBLIC "${GENERATED_SOURCE_DIR}")
 
 target_link_libraries(mapcraftercore "${Boost_IOSTREAMS_LIBRARY}" "${Boost_SYSTEM_LIBRARY}" "${Boost_FILESYSTEM_LIBRARY}")
 if(OPT_USE_BOOST_THREAD)

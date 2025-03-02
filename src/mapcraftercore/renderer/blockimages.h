@@ -24,7 +24,7 @@
 #include "image.h"
 #include "../mc/pos.h"
 #include "../util/simd.h" //HAVE_EXPLICIT_SIMD, HAVE_ATTRIBUTE_TARGET_AVX2
-#include "../config.h" //AUTO_TARGET_CLONES
+#include <generated/config.h> //AUTO_TARGET_CLONES
 
 #include <boost/filesystem.hpp>
 #include <array>

@@ -19,7 +19,7 @@
 
 #include "other.h"
 
-#include "../config.h"
+#include <generated/config.h>
 
 #include <cctype>
 

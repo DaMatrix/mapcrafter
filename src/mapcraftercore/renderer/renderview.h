@@ -20,7 +20,7 @@
 #ifndef RENDERVIEW_H_
 #define RENDERVIEW_H_
 
-#include "../config.h"
+#include <generated/config.h>
 #include "renderrotation.h"
 
 #include <iostream>

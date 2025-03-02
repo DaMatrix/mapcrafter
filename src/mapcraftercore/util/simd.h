@@ -1,7 +1,7 @@
 #ifndef SIMD_H_
 #define SIMD_H_
 
-#include "../config.h"
+#include <generated/config.h>
 
 #if HAVE_ATTRIBUTE_VECTOR_SIZE
     #define HAVE_EXPLICIT_SIMD 1

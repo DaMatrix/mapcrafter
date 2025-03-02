@@ -21,7 +21,7 @@
 #define IMAGE_H_
 
 #include "../util/other.h" //util::UninitializedTag
-#include "../config.h" //AUTO_TARGET_CLONES
+#include <generated/config.h> //AUTO_TARGET_CLONES
 
 #define _USE_MATH_DEFINES
 #include <cassert>
