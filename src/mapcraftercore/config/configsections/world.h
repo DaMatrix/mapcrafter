@@ -28,9 +28,6 @@
 #include "../../mc/worldcrop.h"
 
 #include <string>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace config {

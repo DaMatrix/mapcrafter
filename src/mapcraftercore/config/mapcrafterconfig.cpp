@@ -105,10 +105,10 @@ bool MapcrafterConfigRootSection::parseField(const std::string key,
 		const std::string value, ValidationList& validation) {
 	if (key == "output_dir") {
 		if (output_dir.load(key, value, validation))
-			output_dir.setValue(BOOST_FS_ABSOLUTE(output_dir.getValue(), config_dir));
+			output_dir.setValue(util::absolute_with_base(output_dir.getValue(), config_dir));
 	} else if (key == "template_dir") {
 		if (template_dir.load(key, value, validation)) {
-			template_dir.setValue(BOOST_FS_ABSOLUTE(template_dir.getValue(), config_dir));
+			template_dir.setValue(util::absolute_with_base(template_dir.getValue(), config_dir));
 			if (!fs::is_directory(template_dir.getValue()))
 				validation.error("'template_dir' must be an existing directory! '"
 						+ template_dir.getValue().string() + "' does not exist!");
@@ -146,7 +146,7 @@ ValidationMap MapcrafterConfig::parseFile(const std::string& filename) {
 		return validation;
 	}
 
-	return parse(config, BOOST_FS_ABSOLUTE1(fs::path(filename)).parent_path());
+	return parse(config, absolute(fs::path(filename)).parent_path());
 }
 
 ValidationMap MapcrafterConfig::parseString(const std::string& string,

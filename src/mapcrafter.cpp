@@ -26,12 +26,10 @@
 #include <string>
 #include <cstring>
 #include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
 
 #include <locale.h>
 
 namespace po = boost::program_options;
-namespace fs = boost::filesystem;
 
 // evil, I know
 using namespace mapcrafter;
@@ -134,28 +132,28 @@ int main(int argc, char** argv) {
 		util::PathList resources = util::findResourceDirs(mapcrafter_bin);
 		std::cout << "Resource directories:" << std::endl;
 		for (size_t i = 0; i < resources.size(); i++)
-			std::cout << "  " << i+1 << ". " << BOOST_FS_ABSOLUTE1(resources[i]).string() << std::endl;
+			std::cout << "  " << i+1 << ". " << absolute(resources[i]) << std::endl;
 		if (resources.size() == 0)
 			std::cout << "  Nothing found." << std::endl;
 
 		util::PathList templates = util::findTemplateDirs(mapcrafter_bin);
 		std::cout << "Template directories:" << std::endl;
 		for (size_t i = 0; i < templates.size(); i++)
-			std::cout << "  " << i+1 << ". " << BOOST_FS_ABSOLUTE1(templates[i]).string() << std::endl;
+			std::cout << "  " << i+1 << ". " << absolute(templates[i]) << std::endl;
 		if (templates.size() == 0)
 			std::cout << "  Nothing found." << std::endl;
 
 		util::PathList blocks = util::findBlockDirs(mapcrafter_bin);
 		std::cout << "Block directories:" << std::endl;
 		for (size_t i = 0; i < blocks.size(); i++)
-			std::cout << "  " << i+1 << ". " << BOOST_FS_ABSOLUTE1(blocks[i]).string() << std::endl;
+			std::cout << "  " << i+1 << ". " << absolute(blocks[i]) << std::endl;
 		if (blocks.size() == 0)
 			std::cout << "  Nothing found." << std::endl;
 
 		util::PathList configs = util::findLoggingConfigFiles(mapcrafter_bin);
 		std::cout << "Logging configuration file:" << std::endl;
 		for (size_t i = 0; i < configs.size(); i++)
-			std::cout << "  " << i+1 << ". " << BOOST_FS_ABSOLUTE1(configs[i]).string() << std::endl;
+			std::cout << "  " << i+1 << ". " << absolute(configs[i]) << std::endl;
 		if (configs.size() == 0)
 			std::cout << "  Nothing found." << std::endl;
 		return 0;

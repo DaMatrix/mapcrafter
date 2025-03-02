@@ -24,14 +24,11 @@
 #include "../validation.h"
 #include "../../renderer/rendermode.h"
 #include "../../renderer/renderview.h"
+#include "../../util/filesystem.h"
 
 #include <iostream>
-#include <memory> //std::unique_ptr
 #include <set>
 #include <string>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace renderer {
@@ -100,15 +97,15 @@ public:
 
 	void setConfigDir(const fs::path& config_dir);
 
-	std::string getShortName() const;
-	std::string getLongName() const;
-	std::string getWorld() const;
+	const std::string& getShortName() const;
+	const std::string& getLongName() const;
+	const std::string& getWorld() const;
 
 	renderer::RenderViewType getRenderView() const;
 	renderer::RenderModeType getRenderMode() const;
 	renderer::OverlayType getOverlay() const;
-	std::set<renderer::RenderRotation::Direction> getRotations() const;
-	fs::path getBlockDir() const;
+	const std::set<renderer::RenderRotation::Direction>& getRotations() const;
+	const fs::path& getBlockDir() const;
 	int getTextureSize() const;
 	double getWaterOpacity() const;
 	int getTileWidth() const;

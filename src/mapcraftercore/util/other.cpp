@@ -21,6 +21,7 @@
 
 #include <generated/config.h>
 
+#include <cassert>
 #include <cctype>
 
 namespace mapcrafter {

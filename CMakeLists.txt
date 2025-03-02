@@ -25,7 +25,7 @@ if(OPT_LINK_BOOST_STATICALLY)
     include_directories(${ZLIB_INCLUDE_DIRS})
 endif()
 
-find_package(Boost COMPONENTS iostreams system filesystem program_options REQUIRED)
+find_package(Boost COMPONENTS iostreams system program_options REQUIRED)
 if(OPT_USE_BOOST_THREAD)
     find_package(Boost COMPONENTS thread REQUIRED)
 else()

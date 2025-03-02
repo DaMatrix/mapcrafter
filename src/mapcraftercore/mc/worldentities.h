@@ -24,13 +24,12 @@
 #include "pos.h"
 #include "world.h"
 #include "worldcrop.h"
+#include "../util/filesystem.h"
 
 #include <array>
+#include <string>
 #include <map>
 #include <vector>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace mc {
@@ -86,7 +85,7 @@ private:
 	 * Reads the file with the cached entities and returns a timestamp when this cache
 	 * was updated the last time.
 	 */
-	unsigned int readCacheFile();
+	fs::file_time_type readCacheFile();
 
 	/**
 	 * Writes the file with the cached entities.

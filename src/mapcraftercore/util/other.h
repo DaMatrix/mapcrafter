@@ -20,14 +20,13 @@
 #ifndef OTHER_H_
 #define OTHER_H_
 
+#include "filesystem.h"
+
 #include <cstring> //std::memcpy()
 #include <map>
 #include <string>
 #include <sstream>
 #include <type_traits> //std::is_pod
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace util {

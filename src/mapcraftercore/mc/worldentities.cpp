@@ -130,10 +130,10 @@ WorldEntitiesCache::WorldEntitiesCache(const World& world)
 WorldEntitiesCache::~WorldEntitiesCache() {
 }
 
-unsigned int WorldEntitiesCache::readCacheFile() {
+fs::file_time_type WorldEntitiesCache::readCacheFile() {
 	if (!fs::exists(cache_file)) {
 		LOG(DEBUG) << "Cache file " << cache_file << " does not exist.";
-		return 0;
+		return {};
 	}
 
 	nbt::NBTFile nbt_file;
@@ -164,9 +164,11 @@ unsigned int WorldEntitiesCache::readCacheFile() {
 		}
 	}
 
+	fs::file_time_type time = fs::last_write_time(cache_file);
+	std::time_t time_seconds = std::chrono::system_clock::to_time_t(util::fsTimeToSystem(time));
 	LOG(DEBUG) << "Read cache file " << cache_file << ". Last modification time was "
-			<< fs::last_write_time(cache_file) << ".";
-	return fs::last_write_time(cache_file);
+			<< std::put_time(std::localtime(&time_seconds), "%F %T") << ".";
+	return time;
 }
 
 void WorldEntitiesCache::writeCacheFile() const {
@@ -200,7 +202,7 @@ void WorldEntitiesCache::writeCacheFile() const {
 }
 
 void WorldEntitiesCache::update(util::IProgressHandler* progress) {
-	unsigned int timestamp = readCacheFile();
+	fs::file_time_type timestamp = readCacheFile();
 
 	auto regions = world.getAvailableRegions();
 	if (progress != nullptr)
@@ -210,15 +212,15 @@ void WorldEntitiesCache::update(util::IProgressHandler* progress) {
 		fs::path region_path = world.getRegionPath(*region_it);
 		if (fs::last_write_time(region_path) < timestamp) {
 			LOG(DEBUG) << "Entities of region " << region_path.filename()
-					<< " are cached (mtime region " << fs::last_write_time(region_path)
-					<< " < mtime cache " << timestamp << ").";
+					<< " are cached (mtime region " << std::chrono::system_clock::to_time_t(util::fsTimeToSystem(fs::last_write_time(region_path)))
+					<< " < mtime cache " << std::chrono::system_clock::to_time_t(util::fsTimeToSystem(timestamp)) << ").";
 			if (progress != nullptr)
 				progress->incrementValue();
 			continue;
 		} else {
 			LOG(DEBUG) << "Entities of region " << region_path.filename()
-					<< " are outdated. (mtime region file " << fs::last_write_time(region_path)
-					<< " >= mtime cache " << timestamp << "). Updating.";
+					<< " are outdated. (mtime region file " << std::chrono::system_clock::to_time_t(util::fsTimeToSystem(fs::last_write_time(region_path)))
+					<< " >= mtime cache " << std::chrono::system_clock::to_time_t(util::fsTimeToSystem(timestamp)) << "). Updating.";
 		}
 
 		RegionFile region;
@@ -227,7 +229,7 @@ void WorldEntitiesCache::update(util::IProgressHandler* progress) {
 
 		auto chunks = region.getContainingChunks();
 		for (auto chunk_it = chunks.begin(); chunk_it != chunks.end(); ++chunk_it) {
-			if (region.getChunkTimestamp(*chunk_it) < timestamp)
+			if (util::systemTimeToFs(std::chrono::system_clock::time_point(std::chrono::seconds(region.getChunkTimestamp(*chunk_it)))) < timestamp)
 				continue;
 
 			this->entities[*region_it][*chunk_it].clear();

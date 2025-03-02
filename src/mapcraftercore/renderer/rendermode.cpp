@@ -33,10 +33,6 @@
 #include "../mc/world.h"
 #include "../util.h"
 
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
-
 namespace mapcrafter {
 namespace renderer {
 

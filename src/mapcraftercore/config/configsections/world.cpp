@@ -160,7 +160,7 @@ bool WorldSection::parseField(const std::string key, const std::string value,
 		ValidationList& validation) {
 	if (key == "input_dir") {
 		if (input_dir.load(key, value, validation)) {
-			input_dir.setValue(BOOST_FS_ABSOLUTE(input_dir.getValue(), config_dir));
+			input_dir.setValue(util::absolute_with_base(input_dir.getValue(), config_dir));
 			if (!fs::is_directory(input_dir.getValue()))
 				validation.error("'input_dir' must be an existing directory! '"
 						+ input_dir.getValue().string() + "' does not exist!");

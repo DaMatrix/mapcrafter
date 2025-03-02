@@ -4,10 +4,10 @@ CHECK_CXX_SOURCE_COMPILES("int main() { void* p = nullptr; }" HAVE_NULLPTR)
 CHECK_CXX_SOURCE_COMPILES("enum class Test { A=0, B=1, C=3 }; int main() { Test::A < Test::C; }" HAVE_ENUM_CLASS_COMPARISON)
 CHECK_CXX_SOURCE_COMPILES("enum class Test; enum class Test { A, B }; int main() { Test::A == Test::B; }" HAVE_ENUM_CLASS_FORWARD_DECLARATION)
 
-INCLUDE(CheckIncludeFiles)
-CHECK_INCLUDE_FILES("sys/ioctl.h" HAVE_SYS_IOCTL_H)
-CHECK_INCLUDE_FILES("unistd.h" HAVE_UNISTD_H)
-CHECK_INCLUDE_FILES("syslog.h" HAVE_SYSLOG_H)
+INCLUDE(CheckIncludeFileCXX)
+CHECK_INCLUDE_FILE_CXX("sys/ioctl.h" HAVE_SYS_IOCTL_H)
+CHECK_INCLUDE_FILE_CXX("unistd.h" HAVE_UNISTD_H)
+CHECK_INCLUDE_FILE_CXX("syslog.h" HAVE_SYSLOG_H)
 
 CHECK_CXX_SOURCE_COMPILES("
     template<class T, int N> using vec __attribute__((vector_size(sizeof(T) * N))) = T;
@@ -100,7 +100,7 @@ add_dependencies(mapcraftercore version.cpp)
 # This is PUBLIC because it's indirectly included by mapcrafter.cpp which is compiled as a separate target
 target_include_directories(mapcraftercore PUBLIC "${GENERATED_SOURCE_DIR}")
 
-target_link_libraries(mapcraftercore "${Boost_IOSTREAMS_LIBRARY}" "${Boost_SYSTEM_LIBRARY}" "${Boost_FILESYSTEM_LIBRARY}")
+target_link_libraries(mapcraftercore "${Boost_IOSTREAMS_LIBRARY}" "${Boost_SYSTEM_LIBRARY}")
 if(OPT_USE_BOOST_THREAD)
     target_link_libraries(mapcraftercore "${Boost_THREAD_LIBRARY}")
 endif()

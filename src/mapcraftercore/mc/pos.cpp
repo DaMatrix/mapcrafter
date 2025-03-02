@@ -19,16 +19,14 @@
 
 #include <sys/param.h>
 
-#include <boost/filesystem.hpp>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 
 #include "../util.h"
 #include "chunk.h"
 #include "pos.h"
 #include "region.h"
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace mc {
@@ -53,11 +51,11 @@ bool RegionPos::operator<(const RegionPos& other) const {
 }
 
 RegionPos RegionPos::byFilename(const std::string& filename) {
-	std::string name = BOOST_FS_FILENAME(fs::path(filename));
+	auto name = fs::path(filename).filename();
 
 	int x, z;
 	if (sscanf(name.c_str(), "r.%d.%d.mca", &x, &z) != 2)
-		throw std::runtime_error("Invalid filename " + name + "!");
+		throw std::runtime_error("Invalid filename " + name.string() + "!");
 	return RegionPos(x, z);
 }
 

@@ -20,15 +20,19 @@
 #ifndef FILESYSTEM_H_
 #define FILESYSTEM_H_
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
-#include <boost/filesystem.hpp>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 namespace mapcrafter {
 namespace util {
+
+std::chrono::system_clock::time_point fsTimeToSystem(fs::file_time_type fs_time) noexcept;
+
+fs::file_time_type systemTimeToFs(std::chrono::system_clock::time_point system_time) noexcept;
 
 /**
  * Opens a binary file for reading.
@@ -97,6 +101,13 @@ void writeEntireFile(const fs::path& path, const std::vector<uint8_t>& data);
  * @throws std::exception if the operation fails
  */
 void writeEntireFile(const fs::path& path, const void* data, size_t size);
+
+/**
+ * Emulate the behavior of boost's two-argument filesystem::absolute() function.
+ *
+ * https://www.boost.org/doc/libs/1_87_0/libs/filesystem/doc/reference.html#absolute
+ */
+fs::path absolute_with_base(const fs::path& path, const fs::path& base);
 
 /**
  * Returns the home directory of the current user.

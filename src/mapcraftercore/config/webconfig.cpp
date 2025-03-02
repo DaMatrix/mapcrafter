@@ -27,9 +27,8 @@ namespace config {
 
 WebConfig::WebConfig(const MapcrafterConfig& config)
 	: config(config) {
-	auto maps = config.getMaps();
-	for (auto map_it = maps.begin(); map_it != maps.end(); ++map_it) {
-		std::string map_name = map_it->getShortName();
+	for (const auto& map_it : config.getMaps()) {
+		auto&& map_name = map_it.getShortName();
 
 		// set tile size to something != 0 for now,
 		// because Leaflet is sad if the tile size is 0
@@ -38,12 +37,10 @@ WebConfig::WebConfig(const MapcrafterConfig& config)
 		// -> greater values seem to work
 		map_tile_size[map_name] = std::make_tuple<>(420, 420);
 		map_max_zoom[map_name] = 0;
-		for (int i = 0; i < 4; i++)
-			map_last_rendered[map_name][i] = 0;
+		std::fill(map_last_rendered[map_name].begin(), map_last_rendered[map_name].end(), 0);
 
-		auto tile_sets = map_it->getTileSets();
-		for (auto tile_set_it = tile_sets.begin(); tile_set_it != tile_sets.end(); ++tile_set_it)
-			tile_sets_max_zoom[*tile_set_it] = 0;
+		for (const auto& tile_set_it : map_it.getTileSets())
+			tile_sets_max_zoom[tile_set_it] = 0;
 	}
 }
 
@@ -130,7 +127,7 @@ bool WebConfig::readConfigJS() {
 					int offset_y = section.get<int>("tile_offset_y", 0);
 					renderer::TilePos offset(offset_x, offset_y);
 					tile_set_tile_offset[*tile_set_it] = offset;
-					map_last_rendered[map_name][rotation] = section.get<int>("last_render");
+					map_last_rendered[map_name][rotation] = section.get<std::time_t>("last_render");
 				}
 			} catch (config::INIConfigError& exception) {
 				LOG(WARNING) << "Unable to read map.settings file: " << exception.what();
@@ -197,7 +194,7 @@ void WebConfig::setMapMaxZoom(const std::string& map, int zoomlevel) {
 	map_max_zoom[map] = zoomlevel;
 }
 
-int WebConfig::getMapLastRendered(const std::string& map,
+std::time_t WebConfig::getMapLastRendered(const std::string& map,
 		int rotation) const {
 	if (!map_last_rendered.count(map))
 		return 0;
@@ -205,8 +202,8 @@ int WebConfig::getMapLastRendered(const std::string& map,
 }
 
 void WebConfig::setMapLastRendered(const std::string& map,
-		int rotation, int last_rendered) {
-	map_last_rendered[map][rotation] = last_rendered;
+		int rotation, std::time_t last_rendered) {
+	map_last_rendered.at(map).at(rotation) = last_rendered;
 }
 
 picojson::value WebConfig::getConfigJSON() const {
@@ -283,7 +280,7 @@ picojson::value WebConfig::getConfigJSON() const {
 
 		picojson::array last_rendered_json;
 		for (int rotation = 0; rotation < 4; rotation++) {
-			int last_rendered = getMapLastRendered(map_it->getShortName(), rotation);
+			std::time_t last_rendered = getMapLastRendered(map_it->getShortName(), rotation);
 			last_rendered_json.push_back(picojson::value((double) last_rendered));
 		}
 		map_json["lastRendered"] = picojson::value(last_rendered_json);

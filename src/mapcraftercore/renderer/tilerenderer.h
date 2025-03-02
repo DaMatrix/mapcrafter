@@ -23,12 +23,10 @@
 #include "biomes.h"
 #include "image.h"
 #include "../mc/worldcache.h" // mc::DIR_*
+#include "../util/filesystem.h"
 
 #include <array>
 #include <vector>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 

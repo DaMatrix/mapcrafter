@@ -176,7 +176,7 @@ bool LogSection::parseField(const std::string key, const std::string value,
 	else if (key == "file") {
 		// file is relative to config file
 		if (file.load(key, value, validation))
-			file.setValue(BOOST_FS_ABSOLUTE(file.getValue(), config_dir));
+			file.setValue(util::absolute_with_base(file.getValue(), config_dir));
 	} else
 		return false;
 	return true;

@@ -24,10 +24,6 @@
 #include "../../tilerenderer.h"
 #include "../../renderview.h"
 
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
-
 namespace mapcrafter {
 
 namespace mc {

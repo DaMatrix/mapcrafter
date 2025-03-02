@@ -175,15 +175,15 @@ void MapSection::setConfigDir(const fs::path& config_dir) {
 	this->config_dir = config_dir;
 }
 
-std::string MapSection::getShortName() const {
+const std::string& MapSection::getShortName() const {
 	return name_short;
 }
 
-std::string MapSection::getLongName() const {
+const std::string& MapSection::getLongName() const {
 	return name_long;
 }
 
-std::string MapSection::getWorld() const {
+const std::string& MapSection::getWorld() const {
 	return world.getValue();
 }
 
@@ -199,11 +199,11 @@ renderer::OverlayType MapSection::getOverlay() const {
 	return overlay.getValue();
 }
 
-std::set<renderer::RenderRotation::Direction> MapSection::getRotations() const {
+const std::set<renderer::RenderRotation::Direction>& MapSection::getRotations() const {
 	return rotations_set;
 }
 
-fs::path MapSection::getBlockDir() const {
+const fs::path& MapSection::getBlockDir() const {
 	return block_dir.getValue();
 }
 
@@ -374,7 +374,7 @@ bool MapSection::parseField(const std::string key, const std::string value,
 		rotations.load(key, value ,validation);
 	} else if (key == "block_dir") {
 		if (block_dir.load(key, value, validation)) {
-			block_dir.setValue(BOOST_FS_ABSOLUTE(block_dir.getValue(), config_dir));
+			block_dir.setValue(util::absolute_with_base(block_dir.getValue(), config_dir));
 			if (!fs::is_directory(block_dir.getValue())) {
 				validation.error("'block_dir' must be an existing directory! '"
 						+ block_dir.getValue().string() + "' does not exist!");

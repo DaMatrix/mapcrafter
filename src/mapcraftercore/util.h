@@ -28,7 +28,6 @@
 #endif
 
 // include compat/*.h here if all files need it
-#include "compat/boost.h"
 #include "compat/nullptr.h"
 
 #include "util/filesystem.h"

@@ -252,7 +252,7 @@ void TileSet::findRenderTiles(const mc::World& world, bool auto_center,
 		const std::set<mc::ChunkPos>& region_chunks = region.getContainingChunks();
 		for (auto chunk_it = region_chunks.begin(); chunk_it != region_chunks.end();
 		        ++chunk_it) {
-			int timestamp = region.getChunkTimestamp(*chunk_it);
+			std::time_t timestamp = region.getChunkTimestamp(*chunk_it);
 
 			// now get all tiles of the chunk
 			std::set<TilePos> tiles;
@@ -288,13 +288,13 @@ void TileSet::findRenderTiles(const mc::World& world, bool auto_center,
 
 		// update all tile positions
 		std::set<TilePos> render_tiles_tmp, required_render_tiles_tmp;
-		std::map<TilePos, int> tile_timestamps_tmp;
-		for (auto it = render_tiles.begin(); it != render_tiles.end(); ++it)
-			render_tiles_tmp.insert(*it - tile_offset);
-		for (auto it = required_render_tiles.begin(); it != required_render_tiles.end(); ++it)
-			required_render_tiles_tmp.insert(*it - tile_offset);
-		for (auto it = tile_timestamps.begin(); it != tile_timestamps.end(); ++it)
-			tile_timestamps_tmp[it->first - tile_offset] = it->second;
+		std::map<TilePos, std::time_t> tile_timestamps_tmp;
+		for (const auto& it : render_tiles)
+			render_tiles_tmp.insert(it - tile_offset);
+		for (const auto& it : required_render_tiles)
+			required_render_tiles_tmp.insert(it - tile_offset);
+		for (const auto& it : tile_timestamps)
+			tile_timestamps_tmp[it.first - tile_offset] = it.second;
 
 		render_tiles = render_tiles_tmp;
 		required_render_tiles = required_render_tiles_tmp;
@@ -368,8 +368,8 @@ void TileSet::scan(const mc::World& world, bool auto_center, TilePos& tile_offse
 void TileSet::resetRequired() {
 	required_render_tiles.clear();
 
-	for (auto it = tile_timestamps.begin(); it != tile_timestamps.end(); ++it)
-		required_render_tiles.insert(it->first);
+	for (const auto& it : tile_timestamps)
+		required_render_tiles.insert(it.first);
 
 	required_composite_tiles.clear();
 	findRequiredCompositeTiles(required_render_tiles, required_composite_tiles);
@@ -377,13 +377,12 @@ void TileSet::resetRequired() {
 	updateContainingRenderTiles();
 }
 
-void TileSet::scanRequiredByTimestamp(int last_change) {
+void TileSet::scanRequiredByTimestamp(std::time_t last_change) {
 	required_render_tiles.clear();
 
-	for (std::map<TilePos, int>::iterator it = tile_timestamps.begin();
-			it != tile_timestamps.end(); ++it) {
-		if (it->second >= last_change)
-			required_render_tiles.insert(it->first);
+	for (const auto& it : tile_timestamps) {
+		if (it.second >= last_change)
+			required_render_tiles.insert(it.first);
 	}
 
 	required_composite_tiles.clear();
@@ -396,12 +395,11 @@ void TileSet::scanRequiredByFiletimes(const fs::path& output_dir,
 		std::string image_format) {
 	required_render_tiles.clear();
 
-	for (std::map<TilePos, int>::iterator it = tile_timestamps.begin();
-			it != tile_timestamps.end(); ++it) {
-		TilePath path = TilePath::byTilePos(it->first, depth);
+	for (const auto& it : tile_timestamps) {
+		TilePath path = TilePath::byTilePos(it.first, depth);
 		fs::path file = output_dir / (path.toString() + "." + image_format);
-		if (!fs::exists(file) || fs::last_write_time(file) <= it->second)
-			required_render_tiles.insert(it->first);
+		if (!fs::exists(file) || std::chrono::system_clock::to_time_t(util::fsTimeToSystem(fs::last_write_time(file))) <= it.second)
+			required_render_tiles.insert(it.first);
 	}
 
 	required_composite_tiles.clear();

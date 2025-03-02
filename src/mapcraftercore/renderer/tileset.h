@@ -20,14 +20,13 @@
 #ifndef TILE_H_
 #define TILE_H_
 
+#include <ctime> //std::time_t
 #include <map>
 #include <set>
 #include <vector>
-#include <boost/filesystem.hpp>
 
 #include "renderrotation.h"
-
-namespace fs = boost::filesystem;
+#include "../util/filesystem.h"
 
 /**
  * The renderer renders the world to tiles which are arranged in a quadtree. Every node
@@ -188,7 +187,7 @@ public:
 	 * Scans which tiles are required by testing which tiles were probably changed since
 	 * the timestamp last_change.
 	 */
-	void scanRequiredByTimestamp(int last_change);
+	void scanRequiredByTimestamp(std::time_t last_change);
 
 	/**
 	 * Scans which tiles are required by using the modification times of the already
@@ -283,7 +282,7 @@ private:
 	std::set<TilePos> required_render_tiles;
 	// timestamps of render tiles required to re-render a tile
 	// (= highest timestamp of all chunks in a tile)
-	std::map<TilePos, int> tile_timestamps;
+	std::map<TilePos, std::time_t> tile_timestamps;
 
 	// same here for composite tiles
 	std::set<TilePath> composite_tiles;

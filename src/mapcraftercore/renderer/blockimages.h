@@ -23,16 +23,14 @@
 #include "blockatlas.h"
 #include "image.h"
 #include "../mc/pos.h"
+#include "../util/filesystem.h"
 #include "../util/simd.h" //HAVE_EXPLICIT_SIMD, HAVE_ATTRIBUTE_TARGET_AVX2
 #include <generated/config.h> //AUTO_TARGET_CLONES
 
-#include <boost/filesystem.hpp>
 #include <array>
 #include <memory> //std::unique_ptr
 #include <string>
 #include <cstdint>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 
@@ -230,7 +228,7 @@ public:
 
 	void setBlockSideDarkening(float darken_left, float darken_right);
 
-	bool loadBlockImages(fs::path block_dir, std::string view, int rotation, int texture_size);
+	bool loadBlockImages(const fs::path& block_dir, const std::string& view, int rotation, int texture_size);
 	virtual RGBAImage exportBlocks() const;
 
 	const BlockImage& getBlockImage(uint16_t id) const;

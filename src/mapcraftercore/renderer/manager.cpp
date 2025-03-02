@@ -289,11 +289,9 @@ void RenderManager::renderMap(const std::string& map, RenderRotation::Direction 
 	std::shared_ptr<RenderView> render_view(createRenderView(map_config.getRenderView(), rotation, map_config.getWaterOpacity()));
 
 	// output a small notice if we render this map incrementally
-	int last_rendered = web_config.getMapLastRendered(map, rotation);
-	if (last_rendered != 0) {
-		std::time_t t = last_rendered;
+	if (std::time_t last_rendered = web_config.getMapLastRendered(map, rotation); last_rendered != 0) {
 		char buffer[256];
-		std::strftime(buffer, sizeof(buffer), "%d %b %Y, %H:%M:%S", std::localtime(&t));
+		std::strftime(buffer, sizeof(buffer), "%d %b %Y, %H:%M:%S", std::localtime(&last_rendered));
 		LOG(INFO) << "Last rendering was on " << buffer << ".";
 	}
 
@@ -477,8 +475,8 @@ void RenderManager::writeTemplates() const {
 	fs::copy_file(config.getTemplatePath("markers.js"), config.getOutputPath("markers.js"), fs::copy_options::skip_existing);
 
 	// copy all other files and directories
-	for (fs::directory_iterator it(config.getTemplateDir()), end; it != end; ++it) {
-		std::string filename = BOOST_FS_FILENAME(it->path());
+	for (const auto& entry : fs::directory_iterator(config.getTemplateDir())) {
+		std::string filename = entry.path().filename().string();
 		// do not copy the index.html
 		if (filename == "index.html")
 			continue;
@@ -488,7 +486,7 @@ void RenderManager::writeTemplates() const {
 			continue;
 
 		fs::copy(
-			*it, config.getOutputPath(filename),
+			entry.path(), config.getOutputPath(filename),
 			fs::copy_options::recursive | fs::copy_options::update_existing | fs::copy_options::copy_symlinks);
 	}
 }

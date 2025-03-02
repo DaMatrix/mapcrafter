@@ -28,7 +28,7 @@ namespace nbt = mapcrafter::mc::nbt;
 namespace mapcrafter {
 namespace renderer {
 
-SlimeOverlay::SlimeOverlay(fs::path world_dir)
+SlimeOverlay::SlimeOverlay(const fs::path& world_dir)
 	: OverlayRenderMode(OverlayMode::PER_BLOCK), world_dir(world_dir), world_seed(0) {
 	try {
 		nbt::NBTFile level_dat;

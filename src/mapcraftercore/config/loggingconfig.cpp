@@ -48,7 +48,7 @@ ValidationMap LoggingConfig::parse(const std::string& filename) {
 	ConfigSection root_section;
 	parser.parseRootSection(root_section);
 
-	fs::path config_dir = BOOST_FS_ABSOLUTE1(fs::path(filename)).parent_path();
+	fs::path config_dir = absolute(fs::path(filename)).parent_path();
 	parser.parseSections(log_sections, "log", ConfigDirSectionFactory<LogSection>(config_dir));
 
 	parser.validate();

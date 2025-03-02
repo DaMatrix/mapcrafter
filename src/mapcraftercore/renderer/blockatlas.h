@@ -20,13 +20,12 @@
 #ifndef BLOCKATLAS_H_
 #define BLOCKATLAS_H_
 
-#include <boost/filesystem.hpp>
+#include "../util/filesystem.h"
+
 #include <cstdint>
 #include <bitset>
 #include <limits>
 #include <memory>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 

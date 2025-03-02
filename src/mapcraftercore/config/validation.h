@@ -208,7 +208,7 @@ public:
 	/**
 	 * Gets/sets the value of the field.
 	 */
-	T getValue() const;
+	const T& getValue() const;
 	void setValue(T value);
 
 	/**
@@ -254,7 +254,7 @@ bool Field<T>::require(ValidationList& validation, std::string message) const {
 }
 
 template <typename T>
-T Field<T>::getValue() const {
+const T& Field<T>::getValue() const {
 	return value;
 }
 

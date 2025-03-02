@@ -552,7 +552,7 @@ void RenderedBlockImages::setBlockSideDarkening(float darken_left, float darken_
 	this->darken_right = darken_right;
 }
 
-bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int rotation, int texture_size) {
+bool RenderedBlockImages::loadBlockImages(const fs::path& path, const std::string& view, int rotation, int texture_size) {
 	LOG(INFO) << "I will load block images from " << path << " now";
 
 	if (!fs::is_directory(path)) {

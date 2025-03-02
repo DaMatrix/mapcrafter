@@ -24,16 +24,14 @@
 #include "pos.h"
 #include "region.h"
 #include "worldcrop.h"
+#include "../util/filesystem.h"
 
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <boost/filesystem.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace mc {
@@ -90,29 +88,23 @@ public:
 	 * of the world (Nether, Overworld per default, End). Mapcrafter will automagically
 	 * try to find the right region directory.
 	 */
-	World(std::string world_dir, Dimension dimension, std::string cache_dir);
+	World(const std::string& world_dir, Dimension dimension, const std::string& cache_dir);
 	~World();
-
-	/**
-	 * Find the level folder, as it may varry, depending on the server type used,
-	 * Spigot, Bukkit, Vanilla, Fabric, and mods can put them in different folders.
-	 */
-	static fs::path findWorldDir(fs::path world_dir, Dimension dimension);
 
 	/**
 	 * Returns the directory of the world.
 	 */
-	fs::path getWorldDir() const;
+	const fs::path& getWorldDir() const;
 
 	/**
 	 * Returns the region directory of the world.
 	 */
-	fs::path getRegionDir() const;
+	const fs::path& getRegionDir() const;
 
 	/**
 	 * Returns the cache directory of the world.
 	 */
-	fs::path getCacheDir() const;
+	const fs::path& getCacheDir() const;
 
 	/**
 	 * Returns the used dimension of the world.

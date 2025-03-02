@@ -37,9 +37,9 @@ std::ostream& operator<<(std::ostream& out, Dimension dimension) {
 	return out;
 }
 
-World::World(std::string world_dir, Dimension dimension, std::string cache_dir)
+World::World(const std::string& world_dir, Dimension dimension, const std::string& cache_dir)
 	: world_dir(world_dir), cache_dir(cache_dir), dimension(dimension) {
-	std::string world_name = BOOST_FS_FILENAME(this->world_dir);
+	std::string world_name = this->world_dir.filename().string();
 
 	// try to find the region directory
 	if (dimension == Dimension::OVERWORLD) {
@@ -66,9 +66,8 @@ bool World::readRegions(const fs::path& region_dir) {
 	if(!fs::exists(region_dir))
 		return false;
 	std::string ending = ".mca";
-	for(fs::directory_iterator it(region_dir); it != fs::directory_iterator(); ++it) {
-		std::string region_file = (*it).path().string();
-		std::string filename = BOOST_FS_FILENAME((*it).path());
+	for(const auto& entry : fs::directory_iterator(region_dir)) {
+		std::string filename = entry.path().filename().string();
 
 		if(!std::equal(ending.rbegin(), ending.rend(), filename.rbegin()))
 			continue;
@@ -81,20 +80,20 @@ bool World::readRegions(const fs::path& region_dir) {
 		if (!world_crop.isRegionContained(pos))
 			continue;
 		available_regions.insert(pos);
-		region_files[pos] = it->path().string();
+		region_files[pos] = entry.path().string();
 	}
 	return true;
 }
 
-fs::path World::getWorldDir() const {
+const fs::path& World::getWorldDir() const {
 	return world_dir;
 }
 
-fs::path World::getCacheDir() const {
+const fs::path& World::getCacheDir() const {
 	return cache_dir;
 }
 
-fs::path World::getRegionDir() const {
+const fs::path& World::getRegionDir() const {
 	return region_dir;
 }
 

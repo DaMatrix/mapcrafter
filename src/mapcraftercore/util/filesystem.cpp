@@ -35,6 +35,16 @@
 namespace mapcrafter {
 namespace util {
 
+//TODO: this probably doesn't convert the timestamp correctly to the system clock, but we need C++20 to do that...
+
+std::chrono::system_clock::time_point fsTimeToSystem(fs::file_time_type fs_time) noexcept {
+	return fs_time - fs::file_time_type::clock::now() + std::chrono::system_clock::now();
+}
+
+fs::file_time_type systemTimeToFs(std::chrono::system_clock::time_point system_time) noexcept {
+	return system_time - std::chrono::system_clock::now() + fs::file_time_type::clock::now();
+}
+
 std::ifstream openBinaryFileForRead(const fs::path& path) {
 	std::ifstream result;
 	result.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -75,6 +85,22 @@ void writeEntireFile(const fs::path& path, const void* data, size_t size) {
 	openBinaryFileForWrite(path).write(static_cast<const char*>(data), size);
 }
 
+fs::path absolute_with_base(const fs::path& path, const fs::path& base) {
+	if (path.has_root_name()) {
+		if (path.has_root_directory()) {
+			return path;
+		} else {
+			return path.root_name() / absolute(base).root_directory() / absolute(base).relative_path() / path.relative_path();
+		}
+	} else {
+		if (path.has_root_directory()) {
+			return absolute(base).root_name() / path;
+		} else {
+			return absolute(base) / path;
+		}
+	}
+}
+
 fs::path findHomeDir() {
 	char* path;
 #if defined(OS_WINDOWS)
@@ -109,9 +135,7 @@ fs::path findExecutablePath() {
 	sysctl(mib, 4, buf, &size, NULL, 0);
 	return fs::path(std::string(buf));
 #elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__linux__)
-	int len;
-	if ((len = readlink("/proc/self/exe", buf, sizeof(buf))) != -1)
-		return fs::path(std::string(buf, len));
+	return std::filesystem::read_symlink("/proc/self/exe");
 #elif defined(OS_WINDOWS)
 	GetModuleFileName(NULL, buf, 1024);
 	return fs::path(std::string(buf));
@@ -122,12 +146,12 @@ fs::path findExecutablePath() {
 }
 
 fs::path findExecutableMapcrafterDir(fs::path executable) {
-	std::string filename = BOOST_FS_FILENAME(executable);
+	std::string filename = executable.filename().string();
 	// TODO make it independent of name of the tool
 	if ((filename == "testconfig"
 			|| filename == "mapcrafter_markers"
 			|| filename == "test") &&
-			BOOST_FS_FILENAME(executable.parent_path()) == "tools")
+			executable.parent_path().filename().string() == "tools")
 		return executable.parent_path().parent_path();
 	return executable.parent_path();
 }
@@ -179,6 +203,7 @@ PathList findLoggingConfigFiles(const fs::path& executable) {
 	PathList configs = {
 		mapcrafter_dir.parent_path().parent_path() / "etc" / "mapcrafter" / "logging.conf",
 		mapcrafter_dir / "logging.conf",
+		fs::current_path() / "logging.conf",
 	};
 
 	fs::path home = findHomeDir();

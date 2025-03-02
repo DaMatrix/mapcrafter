@@ -25,14 +25,12 @@
 #include "../config/mapcrafterconfig.h"
 #include "../config/webconfig.h"
 #include "../mc/world.h"
+#include "../util/filesystem.h"
 
 #include <ctime>
 #include <map>
 #include <set>
 #include <vector>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 

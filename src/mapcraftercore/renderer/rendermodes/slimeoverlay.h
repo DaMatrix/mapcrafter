@@ -22,17 +22,14 @@
 #define RENDERMODES_SLIMEOVERLAY_H_
 
 #include "overlay.h"
-
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
+#include "../../util/filesystem.h"
 
 namespace mapcrafter {
 namespace renderer {
 
 class SlimeOverlay : public OverlayRenderMode {
 public:
-	SlimeOverlay(fs::path world_dir);
+	SlimeOverlay(const fs::path& world_dir);
 	virtual ~SlimeOverlay();
 
 	static bool isSlimeChunk(const mc::ChunkPos& chunk, long long world_seed);

@@ -24,14 +24,11 @@
 #include "../renderer/tileset.h"
 #include "../util/picojson.h"
 
+#include <ctime> //std::time_t
 #include <array>
 #include <map>
-#include <set>
+#include <string>
 #include <tuple>
-#include <vector>
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 namespace mapcrafter {
 namespace config {
@@ -59,8 +56,8 @@ public:
 	int getMapMaxZoom(const std::string& map) const;
 	void setMapMaxZoom(const std::string& map, int max_zoom);
 
-	int getMapLastRendered(const std::string& map, int rotation) const;
-	void setMapLastRendered(const std::string& map, int rotation, int last_rendered);
+	std::time_t getMapLastRendered(const std::string& map, int rotation) const;
+	void setMapLastRendered(const std::string& map, int rotation, std::time_t last_rendered);
 
 private:
 	MapcrafterConfig config;
@@ -75,7 +72,7 @@ private:
 	// max zoom of map (= max max zoom level of the world at time of rendering)
 	std::map<std::string, int> map_max_zoom;
 	// last render time of map/rotation
-	std::map<std::string, std::array<int, 4> > map_last_rendered;
+	std::map<std::string, std::array<std::time_t, 4> > map_last_rendered;
 
 	picojson::value getConfigJSON() const;
 	void parseConfigJSON(const picojson::object& object);
