@@ -69,23 +69,6 @@ int rgba_distance2(RGBAPixel value1, RGBAPixel value2) {
 #  endif
 # endif
 
-/**
- * http://www.piko3d.com/tutorials/libpng-tutorial-loading-png-files-from-streams
- */
-static void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length) {
-	//Here we get our IO pointer back from the read struct.
-	//This is the parameter we passed to the png_set_read_fn() function.
-	//Our std::istream pointer.
-	png_voidp a = png_get_io_ptr(pngPtr);
-	//Cast the pointer to std::istream* and read 'length' bytes into 'data'
-	((std::istream*) a)->read((char*) data, length);
-}
-
-static void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length) {
-	png_voidp a = png_get_io_ptr(pngPtr);
-	((std::string*) a)->append((char*) data, length);
-}
-
 template<typename Pixel>
 bool Image<Pixel>::containsRect(size_t x, size_t y, size_t w, size_t h) const {
 	return x <= this->width && x + w <= this->width &&
@@ -214,6 +197,107 @@ AUTO_TARGET_CLONES void RGBAImage::simplifyTransparentPixels() noexcept {
 			});
 }
 
+namespace {
+struct ImageIndexResult {
+	std::vector<RGBAPixel> palette;
+	std::vector<uint8_t> color_table_bytes;
+	size_t height;
+	size_t row_width_bytes;
+	uint32_t bit_depth;
+
+	bool palette_has_transparency;
+
+	std::vector<uint8_t*> getRowPointers() {
+		std::vector<uint8_t*> result(this->height);
+
+		for (size_t i = 0; i < this->height; i++) {
+			result[i] = &this->color_table_bytes[i * this->row_width_bytes];
+		}
+
+		return result;
+	}
+};
+}
+
+static std::unique_ptr<ImageIndexResult> indexPNGImage(const RGBAImage& img, const WritePngOptions& options) {
+	std::unique_ptr<ImageIndexResult> result(new ImageIndexResult);
+
+	size_t max_colors = size_t(1) << static_cast<size_t>(options.palette_bits);
+	result->palette = octreeColorQuantize(img, max_colors);
+
+	result->palette_has_transparency = std::any_of(
+			result->palette.begin(), result->palette.end(),
+			[](RGBAPixel pixel) {
+				return rgba_alpha(pixel) != 255;
+			});
+
+	/*static void setRowPixel(png_byte* line, int bit_depth, int x, uint8_t index) {
+		if (bit_depth == 8) {
+			line[x] = index;
+		} else if (bit_depth == 4) {
+			index &= 0xf;
+			if ((x % 2) == 0)
+				line[x/2] = (line[x/2] & 0x0f) | (index << 4);
+			else
+				line[x/2] = (line[x/2] & 0xf0) | index;
+		} else if (bit_depth == 2) {
+			index &= 0x3;
+			int mod = 3 - (x % 4);
+			line[x/4] = (line[x/4] & ~(0x3 << mod*2)) | (index << mod*2);
+		} else if (bit_depth == 1) {
+			if (index)
+				line[x/8] |= (1 << (7 - (x % 8)));
+			else
+				line[x/8] &= ~(1 << (7 - (x % 8)));
+		}
+	}
+...
+	std::vector<int> data_dithered;
+	if (dithered) {
+		RGBAImage copy = *this;
+		imageDither(copy, p, data_dithered);
+	}
+
+	png_bytep* rows = (png_bytep*) png_malloc(png, height * sizeof(png_bytep));
+	for (size_t y = 0; y < height; y++) {
+		rows[y] = (png_byte*) png_calloc(png, width * sizeof(png_byte));
+		for (size_t x = 0; x < width; x++) {
+			if (dithered) {
+				setRowPixel(rows[y], palette_bits, x, data_dithered[y * width + x]);
+			} else {
+				setRowPixel(rows[y], palette_bits, x, p.getNearestColor(pixel(x, y)));
+			}
+		}
+	}*/
+
+	OctreePalette p(result->palette);
+
+	if (options.palette_bits != WritePngOptions::PaletteBits::PALETTE_BITS_8)
+		throw std::invalid_argument("only WritePngOptions::PaletteBits::PALETTE_BITS_8 is supported!");
+
+	result->height = img.getHeight();
+	result->row_width_bytes = img.getWidth();
+	result->bit_depth = 8;
+
+	result->color_table_bytes.assign(img.getPixelCount(), 0);
+	if (options.dithered) {
+		//dither the image, then copy the dithered pixels into the output color table
+		RGBAImage copy = img;
+		std::vector<int> data_dithered = imageDither(copy, p);
+
+		std::copy(data_dithered.begin(), data_dithered.end(), result->color_table_bytes.begin());
+	} else {
+		//simply map each input pixel to the nearest color in the palette
+		std::transform(
+				img.begin(), img.end(), result->color_table_bytes.begin(),
+				[&p](const RGBAPixel& color) {
+					return p.getNearestColor(color);
+				});
+	}
+
+	return result;
+}
+
 #if HAVE_SPNG_LIBRARY
 namespace {
 	struct spng_ctx_wrapper {
@@ -234,23 +318,9 @@ namespace {
 			std::free(ptr);
 		}
 	};
-}
-#endif
 
-static std::unique_ptr<png_bytep[]> getPNGRowPointers(const RGBAImage& img) {
-	size_t width = img.width;
-	size_t height = img.height;
-	RGBAPixel* p = &img.data[0];
-
-	std::unique_ptr<png_bytep[]> rows(new png_bytep[height]);
-	for (size_t i = 0; i < height; i++, p += width)
-		rows[i] = reinterpret_cast<png_bytep>(p);
-	return rows;
-}
-
-void RGBAImage::readPNG(const std::string& filename) {
-	#if HAVE_SPNG_LIBRARY
-		auto fail = [](int err) {
+	RGBAImage readPNG_spng(const fs::path& filename) {
+		auto fail = [](int err) -> RGBAImage {
 			throw std::runtime_error(std::string("failed to decode png image: ") + spng_strerror(err));
 		};
 
@@ -261,7 +331,7 @@ void RGBAImage::readPNG(const std::string& filename) {
 		spng_set_png_buffer(ctx, file.data(), file.size());
 
 		//determine the image size
-		spng_ihdr ihdr;
+		spng_ihdr ihdr{};
 		if (int ret = spng_get_ihdr(ctx, &ihdr))
 			return fail(ret);
 
@@ -270,122 +340,94 @@ void RGBAImage::readPNG(const std::string& filename) {
 			return fail(ret);
 
 		//resize the actual image buffer
-		this->setSize(ihdr.width, ihdr.height);
-		if (buf_size != this->getPixelCount() * sizeof(RGBAPixel))
+		RGBAImage result(ihdr.width, ihdr.height, util::UninitializedTag{});
+		if (buf_size != result.getPixelCount() * sizeof(RGBAPixel))
 			return fail(SPNG_EBUFSIZ);
 
 		//actually decode the image
-		if (int ret = spng_decode_image(ctx, &this->data[0], buf_size, SPNG_FMT_RGBA8, 0))
+		if (int ret = spng_decode_image(ctx, result.begin(), buf_size, SPNG_FMT_RGBA8, SPNG_DECODE_TRNS))
 			return fail(ret);
-		return;
-	#else
-	auto fail = [] { throw std::runtime_error("failed to decode png image"); };
 
-	std::ifstream file(filename.c_str(), std::ios::binary);
-	if (!file)
-		return fail();
-
-	uint8_t png_signature[8];
-	file.read((char*) &png_signature, 8);
-	if (png_sig_cmp(png_signature, 0, 8) != 0)
-		return fail();
-
-	//prepare all variables with destructors here so that the destructors won't be skipped by a return to setjmp
-	std::unique_ptr<png_bytep[]> rows;
-
-	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!png)
-		return fail();
-
-	png_infop info = png_create_info_struct(png);
-	if (!info) {
-		png_destroy_read_struct(&png, NULL, NULL);
-		return fail();
+		return result;
 	}
 
-	if (setjmp(png_jmpbuf(png))) {
-		png_destroy_read_struct(&png, &info, NULL);
-		return fail();
-	}
-
-	png_set_read_fn(png, (png_voidp) &file, pngReadData);
-	png_set_sig_bytes(png, 8);
-
-	png_read_info(png, info);
-	int color = png_get_color_type(png, info);
-	int bit_depth = png_get_bit_depth(png, info);
-
-	// strip down images of 16 bits per channel to 8 bits per channel
-	if (bit_depth == 16)
-		png_set_strip_16(png);
-
-	// convert gray images to rgb(a)
-	if (color == PNG_COLOR_TYPE_GRAY || color == PNG_COLOR_TYPE_GRAY_ALPHA)
-		png_set_gray_to_rgb(png);
-	// make sure they are also using 8 bit per channel
-	if (color == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
-		png_set_expand_gray_1_2_4_to_8(png);
-
-	// convert indexed images to rgb(a)
-	if (color == PNG_COLOR_TYPE_PALETTE)
-		png_set_palette_to_rgb(png);
-
-	// add alpha channel if not existing
-	if ((color & PNG_COLOR_MASK_ALPHA) == 0)
-		png_set_add_alpha(png, 0xff, PNG_FILLER_AFTER);
-
-	setSize(png_get_image_width(png, info), png_get_image_height(png, info));
-	rows = getPNGRowPointers(*this);
-
-	png_set_interlace_handling(png);
-	png_read_update_info(png, info);
-
-	if (boost::endian::order::native == boost::endian::order::big) {
-		png_set_bgr(png);
-		png_set_swap_alpha(png);
-	}
-	png_read_image(png, rows.get());
-	png_read_end(png, NULL);
-
-	png_destroy_read_struct(&png, &info, NULL);
-	return;
-	#endif
-}
-
-static void configurePngWrite(png_structp png, const WritePngOptions& options) {
-	if (options.compression_level >= 0) {
-		png_set_compression_level(png, options.compression_level);
-	}
-}
-
-#if HAVE_SPNG_LIBRARY
-static void configurePngWrite(spng_ctx* ctx, const WritePngOptions& options) {
-	if (options.compression_level >= 0) {
-		spng_set_option(ctx, SPNG_IMG_COMPRESSION_LEVEL, options.compression_level);
-	}
-}
-#endif
-
-void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& options) const {
-	#if HAVE_SPNG_LIBRARY
+	void writePNG_spng(const RGBAImage& img, const fs::path& filename, const WritePngOptions& options) {
 		auto fail = [](int err) {
 			throw std::runtime_error(std::string("failed to encode png image: ") + spng_strerror(err));
 		};
 
+		//index the image if requested
+		std::unique_ptr<ImageIndexResult> index_result;
+		if (options.indexed) {
+			index_result = indexPNGImage(img, options);
+		}
+
 		//prepare the context
 		spng_ctx_wrapper ctx(SPNG_CTX_ENCODER);
 		spng_set_option(ctx, SPNG_ENCODE_TO_BUFFER, 1);
-		configurePngWrite(ctx, options);
 
+		//apply write options
+		if (options.compression_level >= 0) {
+			spng_set_option(ctx, SPNG_IMG_COMPRESSION_LEVEL, options.compression_level);
+		}
+
+		//prepare the image header
 		spng_ihdr ihdr = {};
-		ihdr.width = width;
-		ihdr.height = height;
-		ihdr.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;
-		ihdr.bit_depth = 8;
+		ihdr.width = img.width;
+		ihdr.height = img.height;
+		if (options.indexed) {
+			ihdr.color_type = SPNG_COLOR_TYPE_INDEXED;
+			ihdr.bit_depth = index_result->bit_depth;
+		} else {
+			ihdr.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;
+			ihdr.bit_depth = 8;
+		}
 		spng_set_ihdr(ctx, &ihdr);
 
+		//if the image is indexed, set the palette
+		const void* img_data;
+		size_t img_data_len;
+		spng_format img_data_fmt;
+		if (options.indexed) {
+			spng_plte plte = {};
+			plte.n_entries = index_result->palette.size();
+			std::transform(
+					index_result->palette.begin(), index_result->palette.end(), plte.entries,
+					[](RGBAPixel pixel) -> spng_plte_entry {
+						spng_plte_entry result = {};
+						result.red = rgba_red(pixel);
+						result.green = rgba_green(pixel);
+						result.blue = rgba_blue(pixel);
+						return result;
+					});
+
+			//this copies the colors into the context, so we don't need to keep the plte/trns around after this
+			if (int ret = spng_set_plte(ctx, &plte))
+				return fail(ret);
+
+			//if the palette contains any transparent pixels, add the transparency info
+			if (index_result->palette_has_transparency) {
+				spng_trns trns = {};
+				trns.n_type3_entries = index_result->palette.size();
+				std::transform(
+						index_result->palette.begin(), index_result->palette.end(), trns.type3_alpha,
+						rgba_alpha);
+
+				if (int ret = spng_set_trns(ctx, &trns))
+					return fail(ret);
+			}
+
+			img_data = index_result->color_table_bytes.data();
+			img_data_len = index_result->color_table_bytes.size();
+			img_data_fmt = SPNG_FMT_RAW;
+		} else {
+			img_data = img.begin();
+			img_data_len = img.getPixelCount() * sizeof(RGBAPixel);
+			img_data_fmt = SPNG_FMT_PNG;
+		}
+
 		//encode the image
-		if (int ret = spng_encode_image(ctx, &this->data[0], this->getPixelCount() * sizeof(RGBAPixel), SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE))
+		if (int ret = spng_encode_image(ctx, img_data, img_data_len, img_data_fmt, SPNG_ENCODE_FINALIZE))
 			return fail(ret);
 
 		//get a pointer to the result buffer
@@ -397,172 +439,260 @@ void RGBAImage::writePNG(const std::string& filename, const WritePngOptions& opt
 
 		//save the result to a file
 		util::writeEntireFile(filename, png_buf.get(), png_size);
-		return;
-	#else
-	auto fail = [] { throw std::runtime_error("failed to encode png image"); };
-
-	std::string file_data;
-	file_data.reserve(getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
-
-	//prepare all variables with destructors here so that the destructors won't be skipped by a return to setjmp
-	std::unique_ptr<png_bytep[]> rows = getPNGRowPointers(*this);
-
-	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (png == NULL)
-		return fail();
-
-	png_infop info = png_create_info_struct(png);
-	if (info == NULL) {
-		png_destroy_write_struct(&png, NULL);
-		return fail();
 	}
-
-	if (setjmp(png_jmpbuf(png))) {
-		png_destroy_write_struct(&png, &info);
-		return fail();
-	}
-
-	png_set_write_fn(png, (png_voidp) &file_data, pngWriteData, NULL);
-	png_set_IHDR(png, info, width, height, 8, PNG_COLOR_TYPE_RGB_ALPHA,
-	        PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-
-	configurePngWrite(png, options);
-
-	png_set_rows(png, info, rows.get());
-
-	if (boost::endian::order::native == boost::endian::order::big)
-		png_write_png(png, info, PNG_TRANSFORM_BGR | PNG_TRANSFORM_SWAP_ALPHA, NULL);
-	else
-		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);
-
-	png_destroy_write_struct(&png, &info);
-
-	//this will throw an exception if it fails
-	util::writeEntireFile(filename, file_data);
-	return;
-#endif
 }
+#endif //HAVE_SPNG_LIBRARY
 
 namespace {
-
-void setRowPixel(png_byte* line, int bit_depth, int x, uint8_t index) {
-	if (bit_depth == 8) {
-		line[x] = index;
-	} else if (bit_depth == 4) {
-		index &= 0xf;
-		if ((x % 2) == 0)
-			line[x/2] = (line[x/2] & 0x0f) | (index << 4);
-		else
-			line[x/2] = (line[x/2] & 0xf0) | index;
-	} else if (bit_depth == 2) {
-		index &= 0x3;
-		int mod = 3 - (x % 4);
-		line[x/4] = (line[x/4] & ~(0x3 << mod*2)) | (index << mod*2);
-	} else if (bit_depth == 1) {
-		if (index)
-			line[x/8] |= (1 << (7 - (x % 8)));
-		else
-			line[x/8] &= ~(1 << (7 - (x % 8)));
-	}
-}
-
-}
-
-bool RGBAImage::writeIndexedPNG(const std::string& filename, const WritePngOptions& options, int palette_bits, bool dithered) const {
-	std::string file_data;
-	file_data.reserve(getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
-
-	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (png == NULL)
-		return false;
-
-	png_infop info = png_create_info_struct(png);
-	if (info == NULL) {
-		png_destroy_write_struct(&png, NULL);
-		return false;
+	void pngReadData(png_structp png, png_bytep data, png_size_t length) {
+		auto* stream = static_cast<std::istream*>(png_get_io_ptr(png));
+		stream->read((char*) data, length);
 	}
 
-	if (setjmp(png_jmpbuf(png))) {
-		png_destroy_write_struct(&png, &info);
-		return false;
+	void pngWriteData(png_structp png, png_bytep data, png_size_t length) {
+		auto* buf = static_cast<std::string*>(png_get_io_ptr(png));
+		buf->append((char*) data, length);
 	}
 
-	int palette_size = 1 << palette_bits;
-	png_set_write_fn(png, (png_voidp) &file_data, pngWriteData, NULL);
-	png_set_IHDR(png, info, width, height, palette_bits, PNG_COLOR_TYPE_PALETTE,
-			PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-
-	configurePngWrite(png, options);
-
-	//std::cout << "Doing quantization." << std::endl;
-	Octree* octree;
-	std::vector<RGBAPixel> colors;
-	octreeColorQuantize(*this, palette_size, colors, &octree);
-	palette_size = colors.size();
-	//std::cout << "Finished quantization. " << palette_size << " colors." << std::endl;
-
-	png_color* palette = (png_color*) png_malloc(png, palette_size * sizeof(png_color));
-	if (palette == NULL) {
-		png_destroy_write_struct(&png, &info);
-		return false;
+	void pngFlushData(png_structp png) {
+		//no-op
 	}
 
-	png_byte* palette_alpha = (png_byte*) png_malloc(png, palette_size * sizeof(png_byte));
-	if (palette_alpha == NULL) {
-		png_free(png, palette);
-		png_destroy_write_struct(&png, &info);
-		return false;
+	struct PNGErrorState {
+		const char* msg_prefix;
+		const fs::path* filename;
+	};
+
+	void pngHandleError(png_structp png, png_const_charp msg) {
+		auto* state = static_cast<PNGErrorState*>(png_get_error_ptr(png));
+		throw std::runtime_error(std::string(state->msg_prefix) + ": \"" + state->filename->native() + "\": " + msg);
 	}
 
-	for (int i = 0; i < palette_size; i++) {
-		palette[i].red = rgba_red(colors[i]);
-		palette[i].green = rgba_green(colors[i]);
-		palette[i].blue = rgba_blue(colors[i]);
-		palette_alpha[i] = rgba_alpha(colors[i]);
+	void pngHandleWarning(png_structp png, png_const_charp msg) {
+		auto* state = static_cast<PNGErrorState*>(png_get_error_ptr(png));
+		LOG(WARNING) << state->msg_prefix << ": \"" << *state->filename << "\": " << msg;
 	}
 
-	png_set_PLTE(png, info, palette, palette_size);
-	png_set_tRNS(png, info, palette_alpha, palette_size, NULL);
+	struct PNGReadCtx {
+		png_structp png;
+		png_infop info;
 
-	OctreePalette p(colors);
-	//OctreePalette2 p(colors);
+		explicit PNGReadCtx(PNGErrorState* error_state) {
+			png = png_create_read_struct(PNG_LIBPNG_VER_STRING, error_state, &pngHandleError, &pngHandleWarning);
+			if (!png) throw std::bad_alloc();
 
-	std::vector<int> data_dithered;
-	if (dithered) {
-		RGBAImage copy = *this;
-		imageDither(copy, p, data_dithered);
-	}
-
-	png_bytep* rows = (png_bytep*) png_malloc(png, height * sizeof(png_bytep));
-	for (size_t y = 0; y < height; y++) {
-		rows[y] = (png_byte*) png_calloc(png, width * sizeof(png_byte));
-		for (size_t x = 0; x < width; x++) {
-			if (dithered) {
-				setRowPixel(rows[y], palette_bits, x, data_dithered[y * width + x]);
-			} else {
-				setRowPixel(rows[y], palette_bits, x, p.getNearestColor(pixel(x, y)));
+			info = png_create_info_struct(png);
+			if (!info) {
+				png_destroy_read_struct(&png, nullptr, nullptr);
+				throw std::bad_alloc();
 			}
 		}
+
+		~PNGReadCtx() {
+			png_destroy_read_struct(&png, &info, nullptr);
+		}
+	};
+
+	struct PNGWriteCtx {
+		png_structp png;
+		png_infop info;
+
+		explicit PNGWriteCtx(PNGErrorState* error_state) {
+			png = png_create_write_struct(PNG_LIBPNG_VER_STRING, error_state, &pngHandleError, &pngHandleWarning);
+			if (!png) throw std::bad_alloc();
+
+			info = png_create_info_struct(png);
+			if (!info) {
+				png_destroy_write_struct(&png, nullptr);
+				throw std::bad_alloc();
+			}
+		}
+
+		~PNGWriteCtx() {
+			png_destroy_write_struct(&png, &info);
+		}
+	};
+
+	RGBAImage readPNG_libpng(const fs::path& filename) {
+		PNGErrorState error_state = {
+				.msg_prefix = "failed to decode png image",
+				.filename = &filename,
+		};
+
+		PNGReadCtx ctx(&error_state);
+		auto& png = ctx.png;
+		auto& info = ctx.info;
+
+		std::ifstream file = util::openBinaryFileForRead(filename);
+
+		//uint8_t png_signature[8];
+		//file.read((char*) &png_signature, 8);
+		//if (png_sig_cmp(png_signature, 0, 8) != 0)
+		//	return fail();
+
+		png_set_read_fn(png, &file, &pngReadData);
+		//png_set_sig_bytes(png, 8);
+
+		png_read_info(png, info);
+		int color = png_get_color_type(png, info);
+		int bit_depth = png_get_bit_depth(png, info);
+
+		// strip down images of 16 bits per channel to 8 bits per channel
+		if (bit_depth == 16)
+			png_set_strip_16(png);
+
+		// convert gray images to rgb(a)
+		if (color == PNG_COLOR_TYPE_GRAY || color == PNG_COLOR_TYPE_GRAY_ALPHA)
+			png_set_gray_to_rgb(png);
+		// make sure they are also using 8 bit per channel
+		if (color == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
+			png_set_expand_gray_1_2_4_to_8(png);
+
+		// convert indexed images to rgb(a)
+		if (color == PNG_COLOR_TYPE_PALETTE)
+			png_set_palette_to_rgb(png);
+
+		// add alpha channel if not existing
+		if ((color & PNG_COLOR_MASK_ALPHA) == 0)
+			png_set_add_alpha(png, 0xff, PNG_FILLER_AFTER);
+
+		// allocate the result image
+		RGBAImage result(png_get_image_width(png, info), png_get_image_height(png, info), util::UninitializedTag{});
+
+		// set up the row pointers
+		std::vector<png_bytep> rows(result.getHeight());
+		for (size_t row = 0; row < result.getHeight(); row++) {
+			rows[row] = reinterpret_cast<png_bytep>(result.rowbegin(row));
+		}
+
+		png_set_interlace_handling(png);
+		png_read_update_info(png, info);
+
+		if (boost::endian::order::native == boost::endian::order::big) {
+			png_set_bgr(png);
+			png_set_swap_alpha(png);
+		}
+		png_read_image(png, rows.data());
+		png_read_end(png, nullptr);
+
+		return result;
 	}
 
-	png_set_rows(png, info, rows);
+	void writePNG_libpng(const RGBAImage& img, const fs::path& filename, const WritePngOptions& options) {
+		std::string file_data;
+		file_data.reserve(img.getPixelCount() * sizeof(RGBAPixel) * 2); //this should be more than enough space
 
-	//if (mapcrafter::util::isBigEndian())
-	//	png_write_png(png, info, PNG_TRANSFORM_BGR | PNG_TRANSFORM_SWAP_ALPHA, NULL);
-	//else
-		png_write_png(png, info, PNG_TRANSFORM_IDENTITY, NULL);
+		PNGErrorState error_state = {
+				.msg_prefix = "failed to encode png image",
+				.filename = &filename,
+		};
 
-	for (size_t y = 0; y < height; y++)
-		png_free(png, rows[y]);
-	png_free(png, rows);
-	png_free(png, palette);
-	png_free(png, palette_alpha);
-	delete octree;
-	png_destroy_write_struct(&png, &info);
+		//index the image if requested
+		std::unique_ptr<ImageIndexResult> index_result;
+		if (options.indexed) {
+			index_result = indexPNGImage(img, options);
+		}
 
-	//this will throw an exception if it fails
-	util::writeEntireFile(filename, file_data);
-	return true;
+		//prepare the context
+		PNGWriteCtx ctx(&error_state);
+		auto& png = ctx.png;
+		auto& info = ctx.info;
+
+		png_set_write_fn(png, &file_data, &pngWriteData, &pngFlushData);
+
+		//prepare the image header
+		int bit_depth, color_type;
+		if (options.indexed) {
+			bit_depth = index_result->bit_depth;
+			color_type = PNG_COLOR_TYPE_PALETTE;
+		} else {
+			bit_depth = 8;
+			color_type = PNG_COLOR_TYPE_RGB_ALPHA;
+		}
+		png_set_IHDR(png, info, img.getWidth(), img.getHeight(), bit_depth, color_type,
+				PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+
+		//apply write options
+		if (options.compression_level >= 0) {
+			png_set_compression_level(png, options.compression_level);
+		}
+
+		//if the image is indexed, set the palette
+		//  we'll allocate the buffers for this in the outer scope, since it's not clear if libpng copies the PLTE/TRNS
+		//  values immediately or only saves the pointer for later.
+		std::array<png_color, 256> palette = {};
+		std::array<png_byte, 256> palette_alpha = {};
+		if (options.indexed) {
+			std::transform(
+					index_result->palette.begin(), index_result->palette.end(), palette.begin(),
+					[](RGBAPixel pixel) -> png_color {
+						png_color result = {};
+						result.red = rgba_red(pixel);
+						result.green = rgba_green(pixel);
+						result.blue = rgba_blue(pixel);
+						return result;
+					});
+
+			png_set_PLTE(png, info, palette.data(), static_cast<int>(index_result->palette.size()));
+
+			//if the palette contains any transparent pixels, add the transparency info
+			if (index_result->palette_has_transparency) {
+				std::transform(
+						index_result->palette.begin(), index_result->palette.end(), palette_alpha.begin(),
+						rgba_alpha);
+
+				png_set_tRNS(png, info, palette_alpha.data(), static_cast<int>(index_result->palette.size()), nullptr);
+			}
+		}
+
+		//prepare pointers to the input rows
+		std::vector<png_bytep> row_pointers;
+		if (options.indexed) {
+			row_pointers = index_result->getRowPointers();
+		} else {
+			row_pointers.assign(img.getHeight(), nullptr);
+			for (size_t row = 0; row < img.getHeight(); row++) {
+				row_pointers[row] = reinterpret_cast<png_bytep>(const_cast<RGBAPixel*>(img.rowbegin(row)));
+			}
+		}
+		png_set_rows(png, info, row_pointers.data());
+
+		//actually write the png image
+		int transforms;
+		if (options.indexed) {
+			//indexed images don't need any transformations applied to the row data
+			transforms = PNG_TRANSFORM_IDENTITY;
+		} else {
+			//for RGBA images, we'll need to reverse the byte order if this is a big-endian machine
+			if (boost::endian::order::native == boost::endian::order::big) {
+				transforms = PNG_TRANSFORM_BGR | PNG_TRANSFORM_SWAP_ALPHA;
+			} else {
+				transforms = PNG_TRANSFORM_IDENTITY;
+			}
+		}
+		png_write_png(png, info, transforms, nullptr);
+
+		//finally, write the finished PNG image to disk!
+		util::writeEntireFile(filename, file_data);
+	}
+}
+
+void RGBAImage::readPNG(const fs::path& filename) {
+	#if HAVE_SPNG_LIBRARY
+		*this = readPNG_spng(filename);
+		return;
+	#endif
+
+	*this = readPNG_libpng(filename);
+}
+
+void RGBAImage::writePNG(const fs::path& filename, const WritePngOptions& options) const {
+	#if HAVE_SPNG_LIBRARY
+		writePNG_spng(*this, filename, options);
+		return;
+	#endif
+
+	writePNG_libpng(*this, filename, options);
 }
 
 /*
@@ -614,7 +744,7 @@ my_error_exit (j_common_ptr cinfo)
   longjmp(myerr->setjmp_buffer, 1);
 }
 
-bool RGBAImage::readJPEG(const std::string& filename) {
+bool RGBAImage::readJPEG(const fs::path& filename) {
 	/* This struct contains the JPEG decompression parameters and pointers to
 	 * working space (which is allocated as needed by the JPEG library).
 	 */
@@ -749,7 +879,7 @@ bool RGBAImage::readJPEG(const std::string& filename) {
 	return true;
 }
 
-bool RGBAImage::writeJPEG(const std::string& filename, int quality,
+bool RGBAImage::writeJPEG(const fs::path& filename, int quality,
 		RGBAPixel background) const {
 
 	/* This struct contains the JPEG compression parameters and pointers to

@@ -250,15 +250,15 @@ void MapSection::loadImage(renderer::RGBAImage &image, const fs::path& filename)
 	bool success;
 	switch (getImageFormat()) {
 		case ImageFormat::PNG:
-			return image.readPNG(filename.string());
+			return image.readPNG(filename);
 		case ImageFormat::JPEG:
-			success = image.readJPEG(filename.string());
+			success = image.readJPEG(filename);
 			break;
 		default:
 			throw std::invalid_argument("unknown image format");
 	}
 	if (!success) {
-		throw std::runtime_error("unknown error occurred while loading image: " + filename.string());
+		throw std::runtime_error("unknown error occurred while loading image: " + filename.native());
 	}
 }
 
@@ -269,17 +269,13 @@ void MapSection::saveImage(const renderer::RGBAImage &image, const fs::path& fil
 		case ImageFormat::PNG: {
 			renderer::WritePngOptions options;
 			options.compression_level = getPNGCompressionLevel();
+			options.indexed = isPNGIndexed();
 
-			if (isPNGIndexed()) {
-				success = image.writeIndexedPNG(filename.string(), options);
-			} else {
-				return image.writePNG(filename.string(), options);
-			}
-			break;
+			return image.writePNG(filename, options);
 		}
 		case ImageFormat::JPEG:
 			success = image.writeJPEG(
-				filename.string(),
+				filename,
 				getJPEGQuality(),
 				renderer::rgba(background_color.red, background_color.green, background_color.blue, 255));
 			break;
@@ -287,7 +283,7 @@ void MapSection::saveImage(const renderer::RGBAImage &image, const fs::path& fil
 			throw std::invalid_argument("unknown image format");
 	}
 	if (!success) {
-		throw std::runtime_error("unknown error occurred while writing image: " + filename.string());
+		throw std::runtime_error("unknown error occurred while writing image: " + filename.native());
 	}
 }
 

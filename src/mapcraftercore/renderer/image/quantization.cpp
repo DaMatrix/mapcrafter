@@ -329,19 +329,21 @@ struct NodeComparator {
 /**
  * Simple octree color quantization: Similar to http://rosettacode.org/wiki/Color_quantization#C
  */
-void octreeColorQuantize(const RGBAImage& image, size_t max_colors,
-		std::vector<RGBAPixel>& colors, Octree** octree) {
+std::vector<RGBAPixel> octreeColorQuantize(const RGBAImage& image, size_t max_colors) {
 	assert(max_colors > 0);
 
+	std::vector<RGBAPixel> colors;
+	colors.reserve(max_colors);
+
 	// have an octree with the colors as leaves
-	Octree* internal_octree = new Octree();
+	Octree internal_octree = {};
 	// and a priority queue of leaves to be processed
 	// the order of leaves is very important, see NodeComparator
 	std::priority_queue<Octree*, std::vector<Octree*>, NodeComparator> queue;
 
 	// insert the colors into the octree
 	for (RGBAPixel color : image) {
-		Octree* node = Octree::findOrCreateNode(internal_octree, color);
+		Octree* node = Octree::findOrCreateNode(&internal_octree, color);
 		node->setColor(color);
 		// add the leaf only once to the queue
 		if (node->getCount() == 1)
@@ -374,10 +376,7 @@ void octreeColorQuantize(const RGBAImage& image, size_t max_colors,
 		queue.pop();
 	}
 
-	if (octree != nullptr)
-		*octree = internal_octree;
-	else
-		delete internal_octree;
+	return colors;
 }
 
 }

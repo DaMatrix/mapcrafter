@@ -28,10 +28,10 @@ namespace renderer {
 /**
  * Floyd-Steinberg dithering: http://en.wikipedia.org/wiki/Floyd-Steinberg_dithering
  */
-void imageDither(RGBAImage& image, Palette& palette, std::vector<int>& data) {
+std::vector<int> imageDither(RGBAImage& image, Palette& palette) {
 	size_t width = image.getWidth();
 	size_t height = image.getHeight();
-	data.assign(width * height, 0);
+	std::vector<int> data(width * height);
 
 	for (size_t y = 0; y < height; y++) {
 		for (size_t x = 0; x < width; x++) {
@@ -65,6 +65,8 @@ void imageDither(RGBAImage& image, Palette& palette, std::vector<int>& data) {
 						error_a * 5/16));
 		}
 	}
+
+	return data;
 }
 
 }

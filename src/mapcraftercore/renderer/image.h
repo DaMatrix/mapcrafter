@@ -20,6 +20,7 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_
 
+#include "../util/filesystem.h" //fs::path
 #include "../util/other.h" //util::UninitializedTag
 #include <generated/config.h> //AUTO_TARGET_CLONES
 
@@ -330,6 +331,15 @@ protected:
 
 struct WritePngOptions {
 	int compression_level = -1;
+
+	bool indexed = false;
+	bool dithered = true;
+	enum class PaletteBits : uint8_t {
+		PALETTE_BITS_1 = 1,
+		PALETTE_BITS_2 = 2,
+		PALETTE_BITS_4 = 4,
+		PALETTE_BITS_8 = 8,
+	} palette_bits = PaletteBits::PALETTE_BITS_8;
 };
 
 // TODO better documentation...
@@ -366,12 +376,11 @@ public:
 	AUTO_TARGET_CLONES void simplifyTransparentPixels() noexcept;
 
 	//these functions may throw an std::exception or return false to indicate failure
-	void readPNG(const std::string& filename);
-	void writePNG(const std::string& filename, const WritePngOptions& options = {}) const;
-	bool writeIndexedPNG(const std::string& filename, const WritePngOptions& options = {}, int palette_bits = 8, bool dithered = true) const;
+	void readPNG(const fs::path& filename);
+	void writePNG(const fs::path& filename, const WritePngOptions& options = {}) const;
 
-	bool readJPEG(const std::string& filename);
-	bool writeJPEG(const std::string& filename, int quality,
+	bool readJPEG(const fs::path& filename);
+	bool writeJPEG(const fs::path& filename, int quality,
 			RGBAPixel background = rgba(255, 255, 255, 255)) const;
 };
 
