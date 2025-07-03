@@ -21,6 +21,7 @@
 
 #include <algorithm> //std::sort()
 #include <atomic>
+#include <memory> // std::allocator
 #include <vector>
 
 #include "blockimages.h"
@@ -31,6 +32,8 @@
 #include "../mc/blockstate.h"
 #include "../mc/pos.h"
 #include "../util.h"
+
+#include <boost/core/noinit_adaptor.hpp>
 
 namespace mapcrafter {
 namespace renderer {
@@ -131,10 +134,13 @@ void TileRenderer::renderTile(const TilePos& tile_pos, RGBAImage& tile) {
 		LOG(DEBUG) << "raised initial tile_images capacity to " << count;
 	}
 
-    std::vector<TileImage*> tile_image_pointers(count);
-    for (size_t i = 0; i < count; i++) {
-        tile_image_pointers[i] = &tile_images[i];
-    }
+	//get pointers to all the TileImages
+	std::vector<TileImage*, boost::noinit_adaptor<std::allocator<TileImage*>>> tile_image_pointers(count);
+	std::transform(
+			tile_images.begin(), tile_images.end(), tile_image_pointers.begin(),
+			[](TileImage& tile_image) -> TileImage* {
+				return &tile_image;
+			});
 
 	// Sort them in order depending of the rotation
 	sortTiles(tile_image_pointers.begin(), tile_image_pointers.end(), (RenderRotation::Direction)render_view->getRotation());
