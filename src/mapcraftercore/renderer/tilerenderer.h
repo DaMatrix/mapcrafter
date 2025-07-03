@@ -52,7 +52,6 @@ struct TileImage {
 	int x, y;
 	RGBAImage image;
 	mc::BlockPos pos;
-	int z_index;
 
 	TileImage() {}
 	TileImage(int width, int height): image(width, height) {}
