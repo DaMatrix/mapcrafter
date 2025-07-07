@@ -113,7 +113,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/util")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread/impl")
 
-add_library(mapcraftercore SHARED ${SOURCE})
+add_library(mapcraftercore STATIC ${SOURCE})
 add_dependencies(mapcraftercore version.cpp)
 
 # Add generated sources to the include path.
