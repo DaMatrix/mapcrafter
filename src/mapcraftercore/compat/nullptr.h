@@ -20,7 +20,7 @@
 #ifndef COMPAT_NULLPTR_H_
 #define COMPAT_NULLPTR_H_
 
-#include "../config.h"
+#include <generated/config.h>
 
 #ifndef HAVE_NULLPTR
 // official workaround for nullptr

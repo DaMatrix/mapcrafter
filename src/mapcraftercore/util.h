@@ -20,7 +20,7 @@
 #ifndef UTIL_H_
 #define UTIL_H_
 
-#include "config.h"
+#include <generated/config.h>
 
 // shortcut to detect Windows
 #if defined(__WIN32__) || defined(__WIN64__) || defined(_WIN32) || defined(_WIN64)
