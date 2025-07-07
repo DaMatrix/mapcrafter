@@ -33,4 +33,18 @@
 
 #cmakedefine OPT_USE_BOOST_THREAD
 
+#cmakedefine01 OPT_AUTO_SIMD
+#cmakedefine AUTO_TARGET_CLONES __attribute__((target_clones("default@AUTO_TARGET_CLONES@")))
+
+//if cmake has determined that target_clones isn't available, ensure that AUTO_TARGET_CLONES expands to nothing
+#ifndef AUTO_TARGET_CLONES
+#define AUTO_TARGET_CLONES
+#endif
+
+#cmakedefine01 HAVE_ATTRIBUTE_TARGET
+#cmakedefine01 HAVE_ATTRIBUTE_TARGET_SSE42
+#cmakedefine01 HAVE_ATTRIBUTE_TARGET_AVX2
+
+#cmakedefine01 HAVE_ATTRIBUTE_VECTOR_SIZE
+
 #endif
