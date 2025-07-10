@@ -25,7 +25,6 @@
 
 #include "image/dithering.h"
 #include "image/quantization.h"
-#include "image/scaling.h"
 #include "../util.h"
 
 #include <jpeglib.h>
@@ -221,42 +220,39 @@ RGBAImage RGBAImage::clip(size_t x, size_t y, size_t w, size_t h) const {
 	return image;
 }
 
-void RGBAImage::resize(RGBAImage& dest, size_t width, size_t height, InterpolationType interpolation) const {
-	if (width == getWidth() && height == getHeight()) {
-		dest = *this;
-		return;
-	}
-	if (interpolation == InterpolationType::AUTO) {
-		interpolation = InterpolationType::BILINEAR;
-		if (width > getWidth() || height > getWidth())
-			interpolation = InterpolationType::NEAREST;
-		if (width == getWidth() / 2 && height == getHeight() / 2)
-			interpolation = InterpolationType::HALF;
-	}
+AUTO_TARGET_CLONES RGBAImage RGBAImage::resizeHalf() const {
+	size_t width = getWidth();
+	size_t height = getHeight();
+	assert(width % 2 == 0 && height % 2 == 0 && "image size must be divisible by two!");
 
-	if (interpolation == InterpolationType::NEAREST) {
-		imageResizeSimple(*this, dest, width, height);
-	} else if (interpolation == InterpolationType::BILINEAR) {
-		imageResizeBilinear(*this, dest, width, height);
-	} else if (interpolation == InterpolationType::HALF) {
-		imageResizeHalf(*this, dest);
-	} else {
-		// should not happen
-		assert(false);
+	RGBAImage result(width / 2, height / 2, util::UninitializedTag{});
+
+	const RGBAPixel* src_it = begin();
+	RGBAPixel* dst_it = result.begin();
+	for (size_t row = 0; row < height; row++) {
+		// For each row: iterate along two rows in the source image at once, reading two pixels from each (for a total
+		// of four pixels at a time), averaging them out and writing a single pixel into the destination image.
+		// This loop is simple enough to be autovectorized by both GCC and clang.
+
+		const RGBAPixel* src_it0 = src_it;
+		const RGBAPixel* src_it1 = src_it + width;
+		for (size_t col = 0; col < width; col++) {
+			RGBAPixel p1 = src_it0[0];
+			RGBAPixel p2 = src_it0[1];
+			RGBAPixel p3 = src_it1[0];
+			RGBAPixel p4 = src_it1[1];
+
+			RGBAPixel highBits = ((p1 >> 2) & 0x3f3f3f3f) + ((p2 >> 2) & 0x3f3f3f3f) + ((p3 >> 2) & 0x3f3f3f3f) + ((p4 >> 2) & 0x3f3f3f3f);
+			RGBAPixel lowBits = (((p1 & 0x03030303) + (p2 & 0x03030303) + (p3 & 0x03030303) + (p4 & 0x03030303)) >> 2) & 0x03030303;
+			*dst_it = highBits + lowBits;
+
+			src_it0 += 2;
+			src_it1 += 2;
+			dst_it++;
+		}
+
+		src_it += width * 2;
 	}
-}
-
-RGBAImage RGBAImage::resize(size_t width, size_t height, InterpolationType interpolation) const {
-	if (width == getWidth() && height == getHeight())
-		return *this;
-	RGBAImage temp;
-	resize(temp, width, height, interpolation);
-	return temp;
-}
-
-RGBAImage RGBAImage::resizeHalf() const {
-	RGBAImage result;
-	imageResizeHalf(*this, result);
 	return result;
 }
 

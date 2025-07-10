@@ -613,15 +613,14 @@ void RenderManager::increaseMaxZoom(const fs::path& dir,
 	}
 
 	// create images for the new directories
-	RGBAImage new1(w, h), new2(w, h), new3(w, h), new4(w, h);
-	RGBAImage old1, old2, old3, old4;
 	// resize the old images...
-	img1.resize(old1, 0, 0, InterpolationType::HALF);
-	img2.resize(old2, 0, 0, InterpolationType::HALF);
-	img3.resize(old3, 0, 0, InterpolationType::HALF);
-	img4.resize(old4, 0, 0, InterpolationType::HALF);
+	RGBAImage old1 = img1.resizeHalf();
+	RGBAImage old2 = img2.resizeHalf();
+	RGBAImage old3 = img3.resizeHalf();
+	RGBAImage old4 = img4.resizeHalf();
 
 	// ...to blit them to the images of the new directories
+	RGBAImage new1(w, h), new2(w, h), new3(w, h), new4(w, h);
 	new1.simpleAlphaBlit(old1, w/2, h/2);
 	new2.simpleAlphaBlit(old2, 0, h/2);
 	new3.simpleAlphaBlit(old3, w/2, 0);
@@ -646,7 +645,7 @@ void RenderManager::increaseMaxZoom(const fs::path& dir,
 	base.simpleAlphaBlit(new2, w, 0);
 	base.simpleAlphaBlit(new3, 0, h);
 	base.simpleAlphaBlit(new4, w, h);
-	base = base.resize(0, 0, InterpolationType::HALF);
+	base = base.resizeHalf();
 	if (image_format == "png")
 		base.writePNG((dir / "base.png").string());
 	else

@@ -276,17 +276,6 @@ protected:
 	bool containsRect(size_t x, size_t y, size_t w, size_t h) const noexcept;
 };
 
-enum class InterpolationType {
-	// nearest-neighbor interpolation, simple one
-	NEAREST,
-	// bilinear interpolation, fancy one
-	BILINEAR,
-	// special interpolation tweaked for resizing to (width/2, height/2)
-	HALF,
-	// automatically choose an interpolation type
-	AUTO
-};
-
 // TODO better documentation...
 class RGBAImage : public Image<RGBAPixel> {
 public:
@@ -317,13 +306,7 @@ public:
 
 	RGBAImage clip(size_t x, size_t y, size_t w, size_t h) const;
 
-	void resize(RGBAImage& dest, size_t width, size_t height,
-			InterpolationType interpolation = InterpolationType::AUTO) const;
-
-	RGBAImage resize(size_t width, size_t height,
-			InterpolationType interpolation = InterpolationType::AUTO) const;
-
-	RGBAImage resizeHalf() const;
+	AUTO_TARGET_CLONES RGBAImage resizeHalf() const;
 
 	bool readPNG(const std::string& filename);
 	bool writePNG(const std::string& filename) const;
