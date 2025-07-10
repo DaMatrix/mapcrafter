@@ -25,8 +25,7 @@
 namespace mapcrafter {
 namespace renderer {
 
-// Singleton pointer
-BlockAtlas* BlockAtlas::instance_ptr = NULL;
+BlockAtlas BlockAtlas::_instance = {};
 
 /*
  * Load a picture and associated text file to populate the atlas with

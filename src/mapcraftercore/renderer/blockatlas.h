@@ -50,15 +50,12 @@ static const uint8_t FACE_UP_COLOR    = ((float)255.0 / 6.0) * 2;
 
 class BlockAtlas {
   private:
-	static BlockAtlas* instance_ptr;
+	static BlockAtlas _instance;
 	BlockAtlas(){};
 
   public:
 	static BlockAtlas& instance() {
-		if (!BlockAtlas::instance_ptr) {
-			BlockAtlas::instance_ptr = new BlockAtlas();
-		}
-		return *BlockAtlas::instance_ptr;
+		return _instance;
 	}
 
 	bool OpenDictionnary(fs::path path, std::string block_file);
