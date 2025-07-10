@@ -123,11 +123,10 @@ void BlockAtlas::ShadeBlock(int idx, int uv_idx, float factor_left, float factor
 	RGBAImage&       block   = *this->block_ptrs[idx];
 	const RGBAImage& uv_mask = *this->block_ptrs[uv_idx];
 
-	assert(block.getWidth() == uv_mask.getWidth());
-	assert(block.getHeight() == uv_mask.getHeight());
+	assert(block.isSameSize(uv_mask));
 
-	for (int x = 0; x < block.getWidth(); x++) {
-		for (int y = 0; y < block.getHeight(); y++) {
+	for (size_t x = 0; x < block.getWidth(); x++) {
+		for (size_t y = 0; y < block.getHeight(); y++) {
 			uint32_t& pixel    = block.pixel(x, y);
 			uint32_t  uv_pixel = uv_mask.pixel(x, y);
 			if (rgba_alpha(uv_pixel) == 0) {

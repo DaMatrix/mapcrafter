@@ -47,8 +47,8 @@ TileRenderer::TileRenderer(const RenderView* render_view, mc::BlockStateRegistry
 			block_images->getBlockImage(
 				block_registry.getBlockID(
 					mc::BlockState::parse("minecraft:water_mask", "level=2" )))),
-		tile_image(waterlog_full_image.image(0).width, waterlog_full_image.image(0).height),
-		waterLogTinted(tile_image.image.width, tile_image.image.height) {
+		tile_image(waterlog_full_image.image(0).getWidth(), waterlog_full_image.image(0).getHeight()),
+		waterLogTinted(tile_image.image.getWidth(), tile_image.image.getHeight()) {
 	assert(block_images);
 	render_mode->initialize(render_view, images, world, &current_chunk);
 	// Pre-allocate rendering buffers
@@ -214,7 +214,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 		tile_image.x = x;
 		tile_image.y = y;
 		tile_image.pos = top;
-		tile_image.image.setSize(image.width,image.height);
+		tile_image.image.setSize(image.getWidth(), image.getHeight());
 
 		// Only display if there's something to print
 		// This applies for water blocks, where we print
@@ -231,9 +231,9 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			}
 
 			if (strip_up || strip_left || strip_right) {
-				for (int i=0; i<tile_image.image.width*tile_image.image.height; i++) {
-					RGBAPixel puv = uv_image.data[i];
-					RGBAPixel p = image.data[i];
+				for (int i=0; i<tile_image.image.getPixelCount(); i++) {
+					RGBAPixel puv = uv_image.data()[i];
+					RGBAPixel p = image.data()[i];
 					switch(rgba_blue(puv)) {
 						case FACE_UP_INDEX:
 							if (strip_up) {
@@ -251,10 +251,10 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 							}
 							break;
 					}
-					tile_image.image.data[i] = p;
+					tile_image.image.data()[i] = p;
 				}
 			} else {
-				std::copy(image.data.begin(), image.data.end(), tile_image.image.data.begin());
+				tile_image.image = image;
 			}
 
 			if (block_image->is_biome) {
@@ -294,7 +294,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 
 		} else {
 			// Clear out the tile from previous rendering
-			std::fill(tile_image.image.data.begin(), tile_image.image.data.end(), 0);
+			tile_image.image.clear();
 		}
 
 
@@ -318,10 +318,10 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			float light = std::max(block.sky_light, block.block_light) / 15.0f;
 			biome_color = rgba(rgba_red(biome_color) * light, rgba_green(biome_color) * light, rgba_blue(biome_color) * light, (render_view->getWaterOpacity() * 255));
 
-			std::vector<RGBAPixel>::const_iterator pit      = waterlog->data.begin();
-			std::vector<RGBAPixel>::const_iterator pitend   = waterlog->data.end();
-			std::vector<RGBAPixel>::const_iterator puvit    = waterlog_uv->data.begin();
-			std::vector<RGBAPixel>::iterator pdestit        = waterLogTinted.data.begin();
+			auto pit      = waterlog->begin();
+			auto pitend   = waterlog->end();
+			auto puvit    = waterlog_uv->begin();
+			auto pdestit        = waterLogTinted.begin();
 
 			if ((water_top || water_south || water_west) == false) {
 				// fast lane

@@ -29,12 +29,12 @@ namespace renderer {
  * Floyd-Steinberg dithering: http://en.wikipedia.org/wiki/Floyd-Steinberg_dithering
  */
 void imageDither(RGBAImage& image, Palette& palette, std::vector<int>& data) {
-	int width = image.getWidth();
-	int height = image.getHeight();
-	data.resize(width * height);
+	size_t width = image.getWidth();
+	size_t height = image.getHeight();
+	data.assign(width * height, 0);
 
-	for (int y = 0; y < image.getHeight(); y++) {
-		for (int x = 0; x < image.getWidth(); x++) {
+	for (size_t y = 0; y < height; y++) {
+		for (size_t x = 0; x < width; x++) {
 			RGBAPixel old_color = image.pixel(x, y);
 			// find nearest palette color and use it
 			int color_id = palette.getNearestColor(old_color);

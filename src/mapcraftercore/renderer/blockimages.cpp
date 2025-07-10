@@ -179,8 +179,8 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		uint32_t& pixel = block.data[i];
-		uint32_t uv_pixel = uv_mask.data[i];
+		uint32_t& pixel = block.data()[i];
+		uint32_t uv_pixel = uv_mask.data()[i];
 		if (rgba_alpha(uv_pixel) == 0) {
 			continue;
 		}
@@ -271,7 +271,7 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 void blockImageMultiply(RGBAImage& block, uint8_t factor) {
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		block.data[i] = rgba_multiply_scalar(block.data[i], factor);
+		block.data()[i] = rgba_multiply_scalar(block.data()[i], factor);
 	}
 }
 
@@ -281,9 +281,9 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask, uint32_t color) {
 
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		uint32_t mask_pixel = mask.data[i];
+		uint32_t mask_pixel = mask.data()[i];
 		if (rgba_alpha(mask_pixel)) {
-			uint32_t& pixel = block.data[i];
+			uint32_t& pixel = block.data()[i];
 			// The mask is not supposed to be transfered directly
 			// but to be blend in with block pixel
 			// This will avoid white pixels on edges of the mask
@@ -296,9 +296,9 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask, uint32_t color) {
 void blockImageTint(RGBAImage& block, uint32_t color) {
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		uint32_t pixel = block.data[i];
+		uint32_t pixel = block.data()[i];
 		if(rgba_alpha(pixel)) {
-			block.data[i] = rgba_multiply(pixel, color);
+			block.data()[i] = rgba_multiply(pixel, color);
 		}
 	}
 }
@@ -323,7 +323,7 @@ void blockImageTintHighContrast(RGBAImage& block, uint32_t color) {
 
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
-		RGBAPixel& pixel = block.data[i];
+		RGBAPixel& pixel = block.data()[i];
 		if ((pixel & 0xff000000) > 0) {
 			pixel = rgba_add_clamp(pixel, nr, ng, nb, 0);
 		}
@@ -343,8 +343,8 @@ void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int fac
 
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
-		RGBAPixel& pixel = block.data[i];
-		RGBAPixel mask_pixel = mask.data[i];
+		RGBAPixel& pixel = block.data()[i];
+		RGBAPixel mask_pixel = mask.data()[i];
 		if (rgba_blue(mask_pixel) == face) {
 			pixel = rgba_add_clamp(pixel, nr, ng, nb, 0);
 		}
@@ -362,10 +362,10 @@ void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
-		RGBAPixel& pixel = block.data[i];
-		const RGBAPixel& uv_pixel = uv_mask.data[i];
-		const RGBAPixel& top_pixel = top.data[i];
-		const RGBAPixel& top_uv_pixel = top_uv_mask.data[i];
+		RGBAPixel& pixel = block.data()[i];
+		const RGBAPixel& uv_pixel = uv_mask.data()[i];
+		const RGBAPixel& top_pixel = top.data()[i];
+		const RGBAPixel& top_uv_pixel = top_uv_mask.data()[i];
 
 		// basically what we want to do is:
 		// compare uv-coords of block vs. waterlog pixels
@@ -391,8 +391,8 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
-		RGBAPixel& pixel = block.data[i];
-		const RGBAPixel& uv_pixel = uv_mask.data[i];
+		RGBAPixel& pixel = block.data()[i];
+		const RGBAPixel& uv_pixel = uv_mask.data()[i];
 
 		// TODO
 		// not really optimized yet, and quite dirty code
