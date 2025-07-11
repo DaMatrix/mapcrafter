@@ -25,9 +25,11 @@
 #include <math.h> // to be sure M_PI is defined
 
 #include <png.h>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <utility> // std::move()
 #include <vector>
 
 namespace mapcrafter {
@@ -115,6 +117,51 @@ enum FaceIndex : uint8_t {
 	FACE_UP_INDEX = 2,
 };
 
+static const uint8_t FACE_INDEX_COUNT = 3;
+
+template<typename T>
+class FaceArray {
+	std::array<T, FACE_INDEX_COUNT> payload;
+
+public:
+	using iterator = typename std::array<T, FACE_INDEX_COUNT>::iterator;
+	using const_iterator = typename std::array<T, FACE_INDEX_COUNT>::const_iterator;
+
+	FaceArray() = default;
+
+	FaceArray(const std::array<T, FACE_INDEX_COUNT>& arr) : payload(arr) {}
+	FaceArray(std::array<T, FACE_INDEX_COUNT>&& arr) : payload(std::move(arr)) {}
+
+	T& left() noexcept { return payload[FACE_LEFT_INDEX]; }
+	T& right() noexcept { return payload[FACE_RIGHT_INDEX]; }
+	T& up() noexcept { return payload[FACE_UP_INDEX]; }
+
+	const T& left() const noexcept { return payload[FACE_LEFT_INDEX]; }
+	const T& right() const noexcept { return payload[FACE_RIGHT_INDEX]; }
+	const T& up() const noexcept { return payload[FACE_UP_INDEX]; }
+
+	T& operator[](FaceIndex face) noexcept { return payload[face]; }
+	const T& operator[](FaceIndex face) const noexcept { return payload[face]; }
+
+	std::array<T, FACE_INDEX_COUNT> toArray() const& { return payload; }
+	std::array<T, FACE_INDEX_COUNT> toArray() && { return std::move(payload); }
+
+	friend bool operator==(const FaceArray& lhs, const FaceArray& rhs) { return lhs.payload == rhs.payload; }
+	friend bool operator!=(const FaceArray& lhs, const FaceArray& rhs) { return lhs.payload != rhs.payload; }
+
+	iterator begin() noexcept { return payload.begin(); }
+	iterator end() noexcept { return payload.end(); }
+
+	const_iterator begin() const noexcept { return payload.begin(); }
+	const_iterator end() const noexcept { return payload.end(); }
+
+	T* data() noexcept { return payload.data(); }
+	const T* data() const noexcept { return payload.data(); }
+
+	size_t size() const noexcept { return payload.size(); }
+	bool empty() const noexcept { return false; }
+};
+
 /**
  * A pixel in a UV texture.
  */
@@ -145,7 +192,7 @@ public:
 	/**
 	 * Gets this UV pixel's face index.
 	 *
-	 * @return the pixel's face index from 0 to 2, or an undefined value if this pixel is fully transparent
+	 * @return the pixel's face index from 0 to 2, or an undefined value (always 0 in practice) if this pixel is fully transparent
 	 */
 	FaceIndex getFace() const noexcept { return static_cast<FaceIndex>(rgba_blue(payload)); }
 };
