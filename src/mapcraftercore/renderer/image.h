@@ -108,10 +108,21 @@ int rgba_distance2(RGBAPixel value1, RGBAPixel value2);
 
 void blend(RGBAPixel& dest, const RGBAPixel& source);
 
+// TODO rename these maybe
+enum FaceIndex : uint8_t {
+	FACE_LEFT_INDEX = 0,
+	FACE_RIGHT_INDEX = 1,
+	FACE_UP_INDEX = 2,
+};
+
 /**
  * A pixel in a UV texture.
  */
 class UVPixel {
+	static const uint8_t FACE_LEFT_COLOR  = ((float)255.0 / 6.0) * 1;
+	static const uint8_t FACE_RIGHT_COLOR = ((float)255.0 / 6.0) * 4;
+	static const uint8_t FACE_UP_COLOR    = ((float)255.0 / 6.0) * 2;
+
 	RGBAPixel payload;
 
 public:
@@ -125,7 +136,7 @@ public:
 	 *
 	 * @return true if this pixel is fully transparent, false otherwise
 	 */
-	bool isFullyTransparent() const noexcept { UVPixel p = *this; return payload == 0; }
+	bool isFullyTransparent() const noexcept { return payload == 0; }
 
 	uint8_t getAlpha() const noexcept { return rgba_alpha(payload); }
 	uint8_t getU() const noexcept { return rgba_red(payload); }
@@ -134,12 +145,9 @@ public:
 	/**
 	 * Gets this UV pixel's face index.
 	 *
-	 * The face index will be 0 iff this pixel is fully transparent, and a value on the range [0,2] otherwise. These
-	 * values correspond to FACE_[LEFT|RIGHT|UP]_INDEX defined in blockatlas.h.
-	 *
 	 * @return the pixel's face index from 0 to 2, or an undefined value if this pixel is fully transparent
 	 */
-	uint8_t getFace() const noexcept { return rgba_blue(payload); }
+	FaceIndex getFace() const noexcept { return static_cast<FaceIndex>(rgba_blue(payload)); }
 };
 
 void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length);
