@@ -30,6 +30,7 @@
 
 #include <jpeglib.h>
 #include <algorithm>
+#include <stdexcept> // std::invalid_argument
 #include <iostream>
 #include <fstream>
 
@@ -129,6 +130,31 @@ void blend(RGBAPixel& dest, const RGBAPixel& source) {
 		dest = (newa << 24) | ((newrgb >> 24) & 0xff0000) | ((newrgb >> 16) & 0xff00)
 		        | ((newrgb >> 8) & 0xff);
 	}
+}
+
+UVPixel::UVPixel(RGBAPixel pixel) {
+	if (rgba_alpha(pixel) == 0) {
+		if (pixel != 0) {
+			throw std::invalid_argument("uv texture contains non-zero transparent pixel!");
+		}
+	} else {
+		uint8_t face;
+		switch (rgba_blue(pixel)) {
+			case FACE_LEFT_COLOR:
+				face = FACE_LEFT_INDEX;
+				break;
+			case FACE_RIGHT_COLOR:
+				face = FACE_RIGHT_INDEX;
+				break;
+			case FACE_UP_COLOR:
+				face = FACE_UP_INDEX;
+				break;
+			default:
+				throw std::invalid_argument("uv texture contains invalid face index!");
+		}
+		pixel = rgba(rgba_red(pixel), rgba_green(pixel), face, rgba_alpha(pixel));
+	}
+	this->payload = pixel;
 }
 
 /**
@@ -973,6 +999,14 @@ bool RGBAImage::writeJPEG(const std::string& filename, int quality,
 
 	/* And we're done! */
 	return true;
+}
+
+UVImage::UVImage(const RGBAImage& src) : Image<UVPixel>(src.width, src.height) {
+	std::transform(
+			src.data.begin(), src.data.end(), data.begin(),
+			[](RGBAPixel rgba) -> UVPixel {
+				return { rgba };
+			});
 }
 
 }

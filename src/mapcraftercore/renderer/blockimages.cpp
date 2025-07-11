@@ -26,6 +26,7 @@
 
 #include <chrono>
 #include <map>
+#include <unordered_set>
 #include <vector>
 
 namespace mapcrafter {
@@ -529,7 +530,7 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 		std::getline(in, first_line);
 	}
 
-    std::set<uint32_t> all_image_uv_indices;
+    std::unordered_set<uint32_t> all_image_uv_indices;
 
 	int lineno = 2;
 	for (std::string line; std::getline(in, line); lineno++) {
@@ -634,33 +635,7 @@ bool RenderedBlockImages::loadBlockImages(fs::path path, std::string view, int r
 	}
 	in.close();
 
-    for (uint32_t image_uv_index : all_image_uv_indices) {
-        RGBAImage& image = BlockAtlas::instance().GetImage(image_uv_index);
-
-        for (RGBAPixel& pixel : image.data) {
-            if (rgba_alpha(pixel) == 0) {
-                if (pixel != 0) {
-                    throw std::invalid_argument("uv texture contains non-zero transparent pixel!");
-                }
-            } else {
-                uint8_t face;
-                switch (rgba_blue(pixel)) {
-                    case FACE_LEFT_COLOR:
-                        face = FACE_LEFT_INDEX;
-                        break;
-                    case FACE_RIGHT_COLOR:
-                        face = FACE_RIGHT_INDEX;
-                        break;
-                    case FACE_UP_COLOR:
-                        face = FACE_UP_INDEX;
-                        break;
-                    default:
-                        throw std::invalid_argument("uv texture contains invalid face index!");
-                }
-                pixel = rgba(rgba_red(pixel), rgba_green(pixel), face, rgba_alpha(pixel));
-            }
-        }
-    }
+	BlockAtlas::instance().MarkUvTextures(all_image_uv_indices);
 
 	prepareBlockImages();
 	//runBenchmark();

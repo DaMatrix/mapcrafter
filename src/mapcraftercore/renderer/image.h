@@ -108,6 +108,40 @@ int rgba_distance2(RGBAPixel value1, RGBAPixel value2);
 
 void blend(RGBAPixel& dest, const RGBAPixel& source);
 
+/**
+ * A pixel in a UV texture.
+ */
+class UVPixel {
+	RGBAPixel payload;
+
+public:
+	UVPixel() noexcept = default;
+	UVPixel(RGBAPixel pixel);
+
+	/**
+	 * Checks if this UV pixel is fully transparent.
+	 *
+	 * A fully transparent UV pixel has an alpha, u, v and face index of 0.
+	 *
+	 * @return true if this pixel is fully transparent, false otherwise
+	 */
+	bool isFullyTransparent() const noexcept { UVPixel p = *this; return payload == 0; }
+
+	uint8_t getAlpha() const noexcept { return rgba_alpha(payload); }
+	uint8_t getU() const noexcept { return rgba_red(payload); }
+	uint8_t getV() const noexcept { return rgba_green(payload); }
+
+	/**
+	 * Gets this UV pixel's face index.
+	 *
+	 * The face index will be 0 iff this pixel is fully transparent, and a value on the range [0,2] otherwise. These
+	 * values correspond to FACE_[LEFT|RIGHT|UP]_INDEX defined in blockatlas.h.
+	 *
+	 * @return the pixel's face index from 0 to 2, or an undefined value if this pixel is fully transparent
+	 */
+	uint8_t getFace() const noexcept { return rgba_blue(payload); }
+};
+
 void pngReadData(png_structp pngPtr, png_bytep data, png_size_t length);
 void pngWriteData(png_structp pngPtr, png_bytep data, png_size_t length);
 
@@ -221,6 +255,11 @@ public:
 	bool readJPEG(const std::string& filename);
 	bool writeJPEG(const std::string& filename, int quality,
 			RGBAPixel background = rgba(255, 255, 255, 255)) const;
+};
+
+class UVImage : public Image<UVPixel> {
+public:
+	UVImage(const RGBAImage& src);
 };
 
 template <typename Pixel>

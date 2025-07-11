@@ -37,6 +37,7 @@ class BlockStateRegistry;
 namespace renderer {
 
 class RGBAImage;
+class UVImage;
 
 // TODO rename these maybe
 enum FaceIndex : uint8_t {
@@ -59,22 +60,23 @@ class BlockAtlas {
 	}
 
 	bool OpenDictionnary(fs::path path, std::string block_file);
+	void MarkUvTextures(const std::unordered_set<uint32_t>& uv_indices);
 
-	uint32_t const                         GetCount() { return this->block_count; };
-	std::shared_ptr<const RGBAImage> const GetImage(uint32_t idx);
+	uint32_t GetCount() const noexcept { return this->images.size(); };
+	const RGBAImage& GetImage(uint32_t idx) const;
+	const UVImage& GetUVImage(uint32_t idx) const;
 
-	void ShadeBlock(int idx, int uv_idx, float factor_left, float factor_right, float factor_up);
+	void ShadeBlock(uint32_t idx, uint32_t uv_idx, float factor_left, float factor_right, float factor_up);
 
 	uint32_t GetBlockWidth() const { return block_width; };
 	uint32_t GetBlockHeight() const { return block_width; };
 
   private:
-	std::vector<std::shared_ptr<RGBAImage> > block_ptrs;
-	std::shared_ptr<RGBAImage>               unknown_block;
-	std::unordered_set<uint16_t>             shaded_blocks;
-	uint32_t                                 block_count;
-	uint32_t                                 block_width;
-	uint32_t                                 block_height;
+	std::vector<std::unique_ptr<RGBAImage>> images;
+	std::vector<std::unique_ptr<UVImage>> uv_images;
+	std::unordered_set<uint32_t> shaded_blocks;
+	uint32_t block_width = 0;
+	uint32_t block_height = 0;
 };
 
 }  // namespace renderer

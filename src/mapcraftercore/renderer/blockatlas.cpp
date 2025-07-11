@@ -22,6 +22,10 @@
 #include "blockatlas.h"
 #include "image.h"
 
+#include <algorithm>
+#include <cassert>
+#include <stdexcept>
+
 namespace mapcrafter {
 namespace renderer {
 
@@ -33,8 +37,8 @@ BlockAtlas BlockAtlas::_instance = {};
  * render all tiles.
  */
 bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
-	this->block_count = 0;
-	this->block_ptrs.clear();
+	this->images.clear();
+	this->uv_images.clear();
 	this->shaded_blocks.clear();
 
 	fs::path info_file  = path / (name + ".txt");
@@ -88,14 +92,12 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 		LOG(ERROR) << "Block atlas doesn't match image index file";
 		return false;
 	}
-	this->block_count = blocks_x * blocks_y;
-	this->block_ptrs.reserve(this->block_count);
-	this->shaded_blocks.reserve(this->block_count);
+	auto block_count = blocks_x * blocks_y;
+	this->images.reserve(block_count);
+	this->shaded_blocks.reserve(block_count);
 	uint32_t x = 0, y = 0;
 	while (y <= blocks_y) {
-		std::shared_ptr<RGBAImage> ptr = std::make_shared<RGBAImage>();
-		*ptr = blocks_atlas.clip(x * block_width, y * block_height, block_width, block_height);
-		this->block_ptrs.emplace_back(ptr);
+		this->images.emplace_back(new RGBAImage(blocks_atlas.clip(x * block_width, y * block_height, block_width, block_height)));
 		x++;
 		if (x >= blocks_x) {
 			x = 0;
@@ -105,46 +107,70 @@ bool BlockAtlas::OpenDictionnary(fs::path path, std::string name) {
 	return true;
 }
 
-std::shared_ptr<const RGBAImage> const BlockAtlas::GetImage(uint32_t idx) {
-	if (idx < 0 || idx >= this->block_count) {
-		LOG(ERROR) << "Block atlas doesn't match image index file ";
-		return this->unknown_block;
+void BlockAtlas::MarkUvTextures(const std::unordered_set<uint32_t>& uv_indices) {
+	if (!this->uv_images.empty()) {
+		throw std::runtime_error{"UV textures already processed!"};
 	}
-	return this->block_ptrs[idx];
+
+	this->uv_images.resize(this->images.size());
+	for (auto uv_idx : uv_indices) {
+		auto& raw_image = this->images.at(uv_idx);
+		assert(raw_image != nullptr && "raw image was already consumed???");
+
+		auto& uv_image = this->uv_images[uv_idx];
+		assert(uv_image == nullptr && "UV image was already constructed???");
+
+		uv_image.reset(new UVImage(*raw_image));
+		raw_image.reset();
+	}
 }
 
-void BlockAtlas::ShadeBlock(int idx, int uv_idx, float factor_left, float factor_right, float factor_up) {
-	if (this->shaded_blocks.find(idx) != this->shaded_blocks.end()) {
+const RGBAImage& BlockAtlas::GetImage(uint32_t idx) const {
+	auto* ptr = this->images.at(idx).get();
+	if (ptr == nullptr) {
+		throw std::invalid_argument{"given index does not refer to a block image"};
+	}
+	return *ptr;
+}
+
+const UVImage& BlockAtlas::GetUVImage(uint32_t idx) const {
+	auto* ptr = this->uv_images.at(idx).get();
+	if (ptr == nullptr) {
+		throw std::invalid_argument{"given index does not refer to a UV image"};
+	}
+	return *ptr;
+}
+
+void BlockAtlas::ShadeBlock(uint32_t idx, uint32_t uv_idx, float factor_left, float factor_right, float factor_up) {
+	if (!this->shaded_blocks.insert(idx).second) {
 		return;
 	}
-	shaded_blocks.insert(idx);
 
-	RGBAImage&       block   = *this->block_ptrs[idx];
-	const RGBAImage& uv_mask = *this->block_ptrs[uv_idx];
+	assert(this->images.at(idx) != nullptr);
+	RGBAImage& block = *this->images.at(idx);
+	const UVImage& uv_mask = this->GetUVImage(uv_idx);
 
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
-	for (int x = 0; x < block.getWidth(); x++) {
-		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel    = block.pixel(x, y);
-			uint32_t  uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
-				continue;
-			}
-
-			uint8_t side = rgba_blue(uv_pixel);
-			if (side == FACE_LEFT_INDEX) {
-				pixel = rgba_multiply(pixel, factor_left, factor_left, factor_left);
-			}
-			if (side == FACE_RIGHT_INDEX) {
-				pixel = rgba_multiply(pixel, factor_right, factor_right, factor_right);
-			}
-			if (side == FACE_UP_INDEX) {
-				pixel = rgba_multiply(pixel, factor_up, factor_up, factor_up);
-			}
-		}
-	}
+	std::transform(
+			block.data.begin(), block.data.end(), uv_mask.data.begin(), block.data.begin(),
+			[factor_left, factor_right, factor_up](RGBAPixel pixel, UVPixel uv_pixel) -> RGBAPixel {
+				if (!uv_pixel.isFullyTransparent()) {
+					switch (uv_pixel.getFace()) {
+						case FACE_LEFT_INDEX:
+							pixel = rgba_multiply(pixel, factor_left, factor_left, factor_left);
+							break;
+						case FACE_RIGHT_INDEX:
+							pixel = rgba_multiply(pixel, factor_right, factor_right, factor_right);
+							break;
+						case FACE_UP_INDEX:
+							pixel = rgba_multiply(pixel, factor_up, factor_up, factor_up);
+							break;
+					}
+				}
+				return pixel;
+			});
 }
 
 }  // namespace renderer
