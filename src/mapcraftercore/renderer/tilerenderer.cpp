@@ -208,7 +208,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			alt = block_image->variant_2_index(alt);
 		}
 		const RGBAImage& image = block_image->image(alt);
-		const RGBAImage& uv_image = block_image->uv_image(alt);
+		const UVImage& uv_image = block_image->uv_image(alt);
 
 		// Prep the tile
 		tile_image.x = x;
@@ -232,9 +232,9 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 
 			if (strip_up || strip_left || strip_right) {
 				for (int i=0; i<tile_image.image.width*tile_image.image.height; i++) {
-					RGBAPixel puv = uv_image.data[i];
+					UVPixel puv = uv_image.data[i];
 					RGBAPixel p = image.data[i];
-					switch(rgba_blue(puv)) {
+					switch(puv.getFace()) {
 						case FACE_UP_INDEX:
 							if (strip_up) {
 								p = 0;
@@ -302,7 +302,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 			// assert( !(water_top && water_south && water_west) );
 
 			const RGBAImage* waterlog;
-			const RGBAImage* waterlog_uv;
+			const UVImage* waterlog_uv;
 			if (water_top || solid_top) {
 				// This will be displayed as full water
 				waterlog = &waterlog_full_image.image(0);
@@ -320,7 +320,7 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 
 			std::vector<RGBAPixel>::const_iterator pit      = waterlog->data.begin();
 			std::vector<RGBAPixel>::const_iterator pitend   = waterlog->data.end();
-			std::vector<RGBAPixel>::const_iterator puvit    = waterlog_uv->data.begin();
+			std::vector<UVPixel>::const_iterator puvit    = waterlog_uv->data.begin();
 			std::vector<RGBAPixel>::iterator pdestit        = waterLogTinted.data.begin();
 
 			if ((water_top || water_south || water_west) == false) {
@@ -343,8 +343,8 @@ void TileRenderer::renderBlocks(int x, int y, mc::BlockPos top, const mc::BlockD
 				{
 					RGBAPixel p = *pit;
 					if (p) {
-						RGBAPixel puv = *puvit;
-						switch(rgba_blue(puv)){
+						UVPixel puv = *puvit;
+						switch(puv.getFace()){
 							case FACE_UP_INDEX:
 								if(water_top) {
 									p = 0;

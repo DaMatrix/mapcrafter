@@ -108,19 +108,19 @@ uint32_t ColorMap::getColor(float x, float y) const {
 BlockImages::~BlockImages() {
 }
 
-void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask) {
+void blockImageTest(RGBAImage& block, const UVImage& uv_mask) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
 	for (int x = 0; x < block.getWidth(); x++) {
 		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel = block.pixel(x, y);
-			uint32_t uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
+			RGBAPixel& pixel = block.pixel(x, y);
+			UVPixel uv_pixel = uv_mask.pixel(x, y);
+			if (uv_pixel.isFullyTransparent()) {
 				continue;
 			}
 
-			uint8_t side = rgba_blue(uv_pixel);
+			uint8_t side = uv_pixel.getFace();
 			if (side == FACE_LEFT_INDEX) {
 				pixel = rgba(255, 0, 0);
 			}
@@ -134,20 +134,20 @@ void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask) {
 	}
 }
 
-void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageMultiplyExcept(RGBAImage& block, const UVImage& uv_mask,
 		uint8_t except_face, float factor) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
 	for (int x = 0; x < block.getWidth(); x++) {
 		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t& pixel = block.pixel(x, y);
-			uint32_t uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
+			RGBAPixel& pixel = block.pixel(x, y);
+			UVPixel uv_pixel = uv_mask.pixel(x, y);
+			if (uv_pixel.isFullyTransparent()) {
 				continue;
 			}
 
-			uint8_t side = rgba_blue(uv_pixel);
+			uint8_t side = uv_pixel.getFace();
 			if (side != except_face) {
 				pixel = rgba_multiply(pixel, factor, factor, factor);
 			}
@@ -164,7 +164,7 @@ inline uint32_t mix(uint32_t x, uint32_t y, uint32_t a) {
 
 }
 
-void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageMultiply(RGBAImage& block, const UVImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
 		const uint8_t *light_fnc) {
 	assert(block.getWidth() == uv_mask.getWidth());
@@ -180,15 +180,15 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		uint32_t& pixel = block.data[i];
-		uint32_t uv_pixel = uv_mask.data[i];
-		if (rgba_alpha(uv_pixel) == 0) {
+		RGBAPixel& pixel = block.data[i];
+		UVPixel uv_pixel = uv_mask.data[i];
+		if (uv_pixel.isFullyTransparent()) {
 			continue;
 		}
 
 		//const CornerValues* vptr = nullptr;
 		uint32_t* f = nullptr;
-		uint8_t side = rgba_blue(uv_pixel);
+		uint8_t side = uv_pixel.getFace();
 		if (side == FACE_LEFT_INDEX) {
 			//vptr = &factors_left;
 			f = fl;
@@ -211,8 +211,8 @@ void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
 		float x = (1-v) * ab + v * cd;
 		*/
 
-		uint32_t u = rgba_red(uv_pixel);
-		uint32_t v = rgba_green(uv_pixel);
+		uint32_t u = uv_pixel.getU();
+		uint32_t v = uv_pixel.getV();
 
 		//uint32_t ab = divide255((255-u), f[0]) + divide255(u, f[1]);
 		//uint32_t cd = divide255((255-u), f[2]) + divide255(u, f[3]);
@@ -282,9 +282,9 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask, uint32_t color) {
 
 	int n = block.getWidth() * block.getHeight();
 	for (int i = 0; i < n; i++) {
-		uint32_t mask_pixel = mask.data[i];
+		RGBAPixel mask_pixel = mask.data[i];
 		if (rgba_alpha(mask_pixel)) {
-			uint32_t& pixel = block.data[i];
+			RGBAPixel& pixel = block.data[i];
 			// The mask is not supposed to be transfered directly
 			// but to be blend in with block pixel
 			// This will avoid white pixels on edges of the mask
@@ -331,7 +331,7 @@ void blockImageTintHighContrast(RGBAImage& block, uint32_t color) {
 	}
 }
 
-void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int face, uint32_t color) {
+void blockImageTintHighContrast(RGBAImage& block, const UVImage& mask, int face, uint32_t color) {
 	assert(block.getWidth() == mask.getWidth());
 	assert(block.getHeight() == mask.getHeight());
 
@@ -345,15 +345,15 @@ void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int fac
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
 		RGBAPixel& pixel = block.data[i];
-		RGBAPixel mask_pixel = mask.data[i];
-		if (rgba_blue(mask_pixel) == face) {
+		UVPixel mask_pixel = mask.data[i];
+		if (!mask_pixel.isFullyTransparent() && mask_pixel.getFace() == face) {
 			pixel = rgba_add_clamp(pixel, nr, ng, nb, 0);
 		}
 	}
 }
 
-void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
-		const RGBAImage& top, const RGBAImage& top_uv_mask) {
+void blockImageBlendZBuffered(RGBAImage& block, const UVImage& uv_mask,
+		const RGBAImage& top, const UVImage& top_uv_mask) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 	assert(top.getWidth() == top_uv_mask.getWidth());
@@ -364,16 +364,16 @@ void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
 		RGBAPixel& pixel = block.data[i];
-		const RGBAPixel& uv_pixel = uv_mask.data[i];
+		const UVPixel& uv_pixel = uv_mask.data[i];
 		const RGBAPixel& top_pixel = top.data[i];
-		const RGBAPixel& top_uv_pixel = top_uv_mask.data[i];
+		const UVPixel& top_uv_pixel = top_uv_mask.data[i];
 
 		// basically what we want to do is:
 		// compare uv-coords of block vs. waterlog pixels
 		// if the uv-coords are the same and both textures pointing up, don't show water here
 
 		// use the Z value of each pixels to blend or not the top pixel
-		if (rgba_alpha(uv_pixel) < rgba_alpha(top_uv_pixel)) {
+		if (uv_pixel.getAlpha() < top_uv_pixel.getAlpha()) {
 			blend(pixel, top_pixel);
 		} else {
 			// The top pixel is behind the block one, so use the alpha of
@@ -385,7 +385,7 @@ void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
 	}
 }
 
-void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageShadowEdges(RGBAImage& block, const UVImage& uv_mask,
 		uint8_t north, uint8_t south, uint8_t east, uint8_t west, uint8_t bottomleft, uint8_t bottomright) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
@@ -393,13 +393,18 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 	size_t n = block.getWidth() * block.getHeight();
 	for (size_t i = 0; i < n; i++) {
 		RGBAPixel& pixel = block.data[i];
-		const RGBAPixel& uv_pixel = uv_mask.data[i];
+		const UVPixel& uv_pixel = uv_mask.data[i];
+
+		//DaPorkchop_: added this check, should be safe
+		if (uv_pixel.isFullyTransparent()) {
+			continue;
+		}
 
 		// TODO
 		// not really optimized yet, and quite dirty code
-		float u = (float) rgba_red(uv_pixel) / 255;
-		float v = (float) rgba_green(uv_pixel) / 255;
-		uint8_t face = rgba_blue(uv_pixel);
+		float u = (float) uv_pixel.getU() / 255;
+		float v = (float) uv_pixel.getV() / 255;
+		uint8_t face = uv_pixel.getFace();
 
 		uint8_t alpha = 0;
 		#define setalpha(x) (alpha = std::max(alpha, (uint8_t) (x)))
@@ -440,15 +445,15 @@ void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
 	}
 }
 
-bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
+bool blockImageIsTransparent(const RGBAImage& block, const UVImage& uv_mask) {
 	assert(block.getWidth() == uv_mask.getWidth());
 	assert(block.getHeight() == uv_mask.getHeight());
 
 	for (int x = 0; x < block.getWidth(); x++) {
 		for (int y = 0; y < block.getHeight(); y++) {
-			uint32_t pixel = block.pixel(x, y);
-			uint32_t uv_pixel = uv_mask.pixel(x, y);
-			if (rgba_alpha(uv_pixel) == 0) {
+			RGBAPixel pixel = block.pixel(x, y);
+			UVPixel uv_pixel = uv_mask.pixel(x, y);
+			if (uv_pixel.isFullyTransparent()) {
 				continue;
 			}
 
@@ -461,23 +466,19 @@ bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask) {
 	return false;
 }
 
-std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv) {
-	std::array<bool, 3> side_mask = {false, false, false};
-	uint8_t mask_indices[3] = {FACE_LEFT_INDEX, FACE_RIGHT_INDEX, FACE_UP_INDEX};
-	for (int x = 0; x < uv.getWidth(); x++) {
-		for (int y = 0; y < uv.getHeight(); y++) {
-			uint32_t pixel = uv.pixel(x, y);
-			if (rgba_alpha(pixel) == 0) {
-				continue;
-			}
+FaceArray<bool> blockImageGetSideMask(const UVImage& uv) {
+	//Compute a bitmask of all the faces which are present in the uv image.
+	//  Fully transparent pixels will set bit 0.
+	//  This loop can be vectorized by both GCC and clang.
+	int32_t mask = 0;
+	for (UVPixel pixel : uv.data) {
+		mask |= 1 << pixel.getFace();
+	}
 
-			uint8_t face = rgba_blue(pixel);
-			for (uint8_t i = 0; i < 3; i++) {
-				if (face == mask_indices[i]) {
-					side_mask[i] = true;
-				}
-			}
-		}
+	//Expand the bitmask into an array of bools
+	FaceArray<bool> side_mask = {};
+	for (int i = 0; i < FACE_INDEX_COUNT; i++) {
+		side_mask[FaceIndex(i)] = (mask & (1 << i)) != 0;
 	}
 	return side_mask;
 }

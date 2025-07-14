@@ -119,6 +119,13 @@ enum FaceIndex : uint8_t {
 
 static const uint8_t FACE_INDEX_COUNT = 3;
 
+//TODO: if we make this into an iterable range instead of an array it could be slightly faster
+static const FaceIndex FACE_INDICES[FACE_INDEX_COUNT] = {
+		FACE_LEFT_INDEX,
+		FACE_RIGHT_INDEX,
+		FACE_UP_INDEX,
+};
+
 template<typename T>
 class FaceArray {
 	std::array<T, FACE_INDEX_COUNT> payload;

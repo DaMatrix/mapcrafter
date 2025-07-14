@@ -75,10 +75,10 @@ public:
 
 typedef std::array<float, 4> CornerValues;
 
-void blockImageTest(RGBAImage& block, const RGBAImage& uv_mask);
-void blockImageMultiplyExcept(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageTest(RGBAImage& block, const UVImage& uv_mask);
+void blockImageMultiplyExcept(RGBAImage& block, const UVImage& uv_mask,
 		uint8_t except_face, float factor);
-void blockImageMultiply(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageMultiply(RGBAImage& block, const UVImage& uv_mask,
 		const CornerValues& factors_left, const CornerValues& factors_right, const CornerValues& factors_up,
 		const uint8_t *light_fnc);
 void blockImageMultiply(RGBAImage& block, uint8_t factor);
@@ -87,13 +87,13 @@ void blockImageTint(RGBAImage& block, const RGBAImage& mask,
 // TODO maybe this should be named something with multiply too
 void blockImageTint(RGBAImage& block, uint32_t color);
 void blockImageTintHighContrast(RGBAImage& block, uint32_t color);
-void blockImageTintHighContrast(RGBAImage& block, const RGBAImage& mask, int face, uint32_t color);
-void blockImageBlendZBuffered(RGBAImage& block, const RGBAImage& uv_mask,
-		const RGBAImage& top, const RGBAImage& top_uv_mask);
-void blockImageShadowEdges(RGBAImage& block, const RGBAImage& uv_mask,
+void blockImageTintHighContrast(RGBAImage& block, const UVImage& mask, int face, uint32_t color);
+void blockImageBlendZBuffered(RGBAImage& block, const UVImage& uv_mask,
+		const RGBAImage& top, const UVImage& top_uv_mask);
+void blockImageShadowEdges(RGBAImage& block, const UVImage& uv_mask,
 		uint8_t north, uint8_t south, uint8_t east, uint8_t west, uint8_t bottomleft, uint8_t bottomright);
-bool blockImageIsTransparent(const RGBAImage& block, const RGBAImage& uv_mask);
-std::array<bool, 3> blockImageGetSideMask(const RGBAImage& uv);
+bool blockImageIsTransparent(const RGBAImage& block, const UVImage& uv_mask);
+FaceArray<bool> blockImageGetSideMask(const UVImage& uv);
 
 enum class LightingType {
 	NONE,
@@ -109,7 +109,7 @@ struct BlockImage {
 	BlockImage()
 		: lighting_specified(false) {}
 
-	std::array<bool, 3> side_mask;
+	FaceArray<bool> side_mask;
 	bool is_transparent;
 	bool is_empty;
 
@@ -146,14 +146,14 @@ struct BlockImage {
 
 	const RGBAImage& image(int32_t idx) const {
 		assert(idx<(int32_t)images_idx.size());
-		return *(BlockAtlas::instance().GetImage(images_idx[idx]));
+		return BlockAtlas::instance().GetImage(images_idx[idx]);
 	}
 	void image(std::vector<uint32_t>& indexes) {
 		images_idx = indexes;
 	}
-	const RGBAImage& uv_image(int32_t idx) const {
+	const UVImage& uv_image(int32_t idx) const {
 		assert(idx<(int32_t)images_idx.size());
-		return *(BlockAtlas::instance().GetImage(uv_images_idx[idx]));
+		return BlockAtlas::instance().GetUVImage(uv_images_idx[idx]);
 	}
 	void uv_image(std::vector<uint32_t>& indexes) {
 		uv_images_idx = indexes;

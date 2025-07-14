@@ -21,6 +21,7 @@
 #define RENDERMODES_LIGHTING_H_
 
 #include "../rendermode.h"
+#include "../image.h" // FaceArray
 
 #include <array>
 
@@ -100,7 +101,8 @@ private:
 	bool day;
 	double lighting_intensity, lighting_water_intensity;
 	bool simulate_sun_light;
-	FaceCorners CORNERS_LEFT, CORNERS_RIGHT, CORNERS_TOP, CORNERS_BOTTOM;
+	FaceArray<FaceCorners> corners;
+	FaceCorners CORNERS_BOTTOM; //this is needed for LightingType::SMOOTH_BOTTOM
 	uint8_t light_func[256];
 
 	/**
@@ -140,7 +142,7 @@ private:
 	 * right face (if not covered by another, not transparent, block).
 	 */
 	void doSmoothLight(RGBAImage& image, const BlockImage& block_image, const mc::BlockPos& pos,
-			uint16_t id, bool use_bottom_corners, const RenderRotation& rotation);
+			uint16_t id, const RenderRotation& rotation);
 
 	/**
 	 * Applies a simple lighting to a block by coloring the whole block with the lighting
