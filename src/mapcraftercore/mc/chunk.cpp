@@ -107,25 +107,25 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 	}
 
 	// then find x/z pos of the chunk
-	if (!nbt.hasTag<nbt::TagInt>("xPos") || !nbt.hasTag<nbt::TagInt>("yPos") || !nbt.hasTag<nbt::TagInt>("zPos")) {
+	if (!nbt.hasTag<nbt::TagInt>("xPos") || !nbt.hasTag<nbt::TagInt>("zPos") || (!nbt.hasTag<nbt::TagInt>("yPos") && !nbt.hasTag<nbt::TagByte>("yPos"))) {
 		LOG(ERROR) << "Corrupt chunk: No x/z position found!";
 		return false;
 	}
 
 	chunkpos = ChunkPos(nbt.findTag<nbt::TagInt>("xPos").payload,
 	                             nbt.findTag<nbt::TagInt>("zPos").payload);
-	int chunk_lowest = nbt.findTag<nbt::TagInt>("yPos").payload;
+
+	int chunk_lowest;
+
+	if (nbt.hasTag<nbt::TagInt>("yPos")) {
+			chunk_lowest = nbt.findTag<nbt::TagInt>("yPos").payload;
+	} else {
+			chunk_lowest = nbt.findTag<nbt::TagByte>("yPos").payload;
+	}
 
 	// now we have the original chunk position:
 	// check whether this chunk is completely contained within the cropped world
 	chunk_completely_contained = world_crop.isChunkCompletelyContained(chunkpos);
-
-	if (nbt.hasTag<nbt::TagString>("Status")) {
-		const nbt::TagString& tag = nbt.findTag<nbt::TagString>("Status");
-		if(! dadap.chunkStatus.isFull(tag.payload) ){
-			return true;
-		}
-	}
 
 	// find sections list
 	// ignore it if section list does not exist, can happen sometimes with the empty
