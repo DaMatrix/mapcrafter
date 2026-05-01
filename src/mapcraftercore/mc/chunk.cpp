@@ -127,13 +127,6 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 	// check whether this chunk is completely contained within the cropped world
 	chunk_completely_contained = world_crop.isChunkCompletelyContained(chunkpos);
 
-	if (nbt.hasTag<nbt::TagString>("Status")) {
-		const nbt::TagString& tag = nbt.findTag<nbt::TagString>("Status");
-		if(! dadap.chunkStatus.isFull(tag.payload) ){
-			return true;
-		}
-	}
-
 	// find sections list
 	// ignore it if section list does not exist, can happen sometimes with the empty
 	// chunks of the end
